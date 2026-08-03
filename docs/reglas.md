@@ -165,13 +165,21 @@ defecto en `lib/fantasy/auth.ts` y el login se puede probar sin configurar nada:
 
 Cada uno se sobreescribe con su `FANTASY_B2C_*` correspondiente.
 
-**Procedencia y nivel de confianza**: salen de leer el código de
+**Procedencia**: salen de leer el código de
 [Externoak/LaLigaApp](https://github.com/Externoak/LaLigaApp), un proyecto
-activo que ataca este mismo juego y la misma API. **No se han verificado contra
-la red desde este repositorio.** Traerlos es seguro porque un parámetro mal
-falla ruidosamente en el login (400/401), nunca en silencio: no puede
-contaminar una recomendación, que es el criterio que aplica el resto del
-documento.
+activo que ataca este mismo juego y la misma API.
+
+**Verificados contra la red el 2026-08-03.** Un intento de login devolvió
+`AADB2C90225: The username or password provided in the request are invalid`,
+que es un error del propio tenant emitido **después** de aceptar la petición
+entera. Para llegar hasta ahí tuvieron que ser correctos la URL de token, la
+política, el `client_id` y la forma del grant: si alguno fallara, el error
+sería otro (`policy not found`, `invalid client`…). Lo único que quedó sin
+validar en esa prueba fueron las credenciales.
+
+De paso, eso cierra la duda de fondo: **se puede hablar con el servidor de
+autenticación de LaLiga desde un servidor cualquiera**, sin proxy ni móvil de
+por medio.
 
 ### Dos cosas que conviene no volver a aprender
 
@@ -182,11 +190,37 @@ con "Fallo de autenticación" — que se lee como "la API está cerrada" cuando 
 único que pasaba es que mirábamos el campo equivocado. Hay tests que lo fijan en
 `lib/fantasy/auth.test.ts`.
 
-**ROPC solo funciona con cuentas locales de B2C**, las de email y contraseña. Si
-tu cuenta del juego es de Google, Apple o Facebook, `--login` va a fallar por
-diseño: el flujo de contraseña no puede hablar con un proveedor externo. La
-salida en ese caso es el flujo interactivo (authorization code + PKCE), que
-**todavía no está implementado**.
+**ROPC solo funciona con cuentas locales de B2C**, las de email y contraseña.
+Con una cuenta de Google, Apple o Facebook el tenant tendría que redirigir al
+proveedor externo para validar, y en un grant de contraseña no hay redirección
+posible: devuelve `AADB2C90225` —"username or password invalid"— **aunque la
+contraseña sea correcta**. Confirmado en la práctica, no es teoría.
+
+Para esas cuentas está el flujo interactivo, ya implementado:
+
+| Parámetro | Valor |
+|---|---|
+| Política | `B2C_1A_5ULAIP_PARAMETRIZED_SIGNIN` (`FANTASY_B2C_INTERACTIVE_POLICY`) |
+| Redirect URI | `authredirect://com.lfp.laligafantasy` (`FANTASY_B2C_REDIRECT_URI`) |
+| PKCE | S256, obligatorio |
+
+Dos detalles que cuestan un rato descubrir:
+
+- **No se manda `prompt=login`.** Esta política personalizada lo rechaza.
+- **El refresh token queda atado a la política que lo emitió.** Refrescar uno
+  del flujo interactivo con la política de contraseña falla, así que la
+  política se guarda junto al token (`auth_tokens.policy`) y se reutiliza.
+
+### El copiar-pegar del login interactivo
+
+La dirección de retorno registrada en el tenant es la de la **app móvil**
+(`authredirect://…`), y registrar una nuestra no está en nuestra mano. El
+navegador no puede navegar a ese esquema, así que `/setup/login` pide pegar la
+URL de vuelta a mano. Es un paso feo pero de una sola vez.
+
+`FANTASY_B2C_REDIRECT_URI` existe justo para poder quitarlo: si algún día se
+comprueba que el tenant acepta el origen del despliegue, se pone ahí y el
+copiar-pegar desaparece.
 
 ### Lo que el cierre de la web NO significa
 

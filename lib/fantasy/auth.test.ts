@@ -1,10 +1,17 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FantasySession,
+  buildAuthorizeUrl,
+  createPkcePair,
+  exchangeAuthorizationCode,
+  extractAuthorizationCode,
   getB2CConfig,
+  getInteractiveConfig,
   loginWithPassword,
   refreshAccessToken,
   tokenUrlWithPolicy,
+  type StoredToken,
   type TokenStore,
 } from "./auth";
 
@@ -173,13 +180,99 @@ describe("configuración", () => {
   });
 });
 
+describe("flujo interactivo (cuentas de Google, Apple o Facebook)", () => {
+  it("genera un par PKCE S256 distinto cada vez", () => {
+    const a = createPkcePair();
+    const b = createPkcePair();
+
+    expect(a.verifier).not.toBe(b.verifier);
+    // El challenge es el SHA-256 del verifier en base64url.
+    const esperado = createHash("sha256").update(a.verifier).digest("base64url");
+    expect(a.challenge).toBe(esperado);
+    // base64url: sin +, / ni =.
+    expect(a.challenge).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it("pide un authorization code con PKCE y la política interactiva", () => {
+    const url = new URL(buildAuthorizeUrl("EL-CHALLENGE"));
+    const { policy, clientId, redirectUri } = getInteractiveConfig();
+
+    expect(url.pathname).toMatch(/authorize$/);
+    expect(url.searchParams.get("response_type")).toBe("code");
+    expect(url.searchParams.get("code_challenge")).toBe("EL-CHALLENGE");
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(url.searchParams.get("p")).toBe(policy);
+    expect(url.searchParams.get("client_id")).toBe(clientId);
+    expect(url.searchParams.get("redirect_uri")).toBe(redirectUri);
+    // Esta política personalizada rechaza prompt=login.
+    expect(url.searchParams.has("prompt")).toBe(false);
+  });
+
+  it("usa una política distinta de la de contraseña", () => {
+    expect(getInteractiveConfig().policy).not.toBe(getB2CConfig().policy);
+  });
+
+  it("canjea el código con el verifier y la política interactiva", async () => {
+    const spy = stubFetch(
+      tokenResponse({ id_token: "t", refresh_token: "r", expires_in: 3600 }),
+    );
+
+    await exchangeAuthorizationCode("EL-CODIGO", "EL-VERIFIER");
+
+    const [url] = spy.mock.calls[0]! as unknown as [string];
+    expect(new URL(url).searchParams.get("p")).toBe(
+      getInteractiveConfig().policy,
+    );
+
+    const body = bodyOf(spy);
+    expect(body.get("grant_type")).toBe("authorization_code");
+    expect(body.get("code")).toBe("EL-CODIGO");
+    expect(body.get("code_verifier")).toBe("EL-VERIFIER");
+    expect(body.get("redirect_uri")).toBe(getInteractiveConfig().redirectUri);
+  });
+});
+
+describe("extractAuthorizationCode", () => {
+  it("saca el código de la URL de vuelta con esquema nativo", () => {
+    expect(
+      extractAuthorizationCode(
+        "authredirect://com.lfp.laligafantasy?code=ABC123&state=x",
+      ),
+    ).toBe("ABC123");
+  });
+
+  it("también acepta una URL https", () => {
+    expect(
+      extractAuthorizationCode("https://ejemplo.com/callback?code=ABC123"),
+    ).toBe("ABC123");
+  });
+
+  it("acepta el código pelado, por si lo copia suelto", () => {
+    expect(extractAuthorizationCode("  ABC123  ")).toBe("ABC123");
+  });
+
+  it("propaga el error de B2C en vez de decir que no hay código", () => {
+    // Si el login falló, el motivo real está en la URL y es lo único útil.
+    expect(() =>
+      extractAuthorizationCode(
+        "authredirect://x?error=access_denied&error_description=El+usuario+cancel%C3%B3",
+      ),
+    ).toThrow(/cancel/);
+  });
+
+  it("devuelve null cuando no hay nada aprovechable", () => {
+    expect(extractAuthorizationCode("")).toBeNull();
+    expect(extractAuthorizationCode("https://ejemplo.com/?otra=cosa")).toBeNull();
+  });
+});
+
 describe("FantasySession", () => {
   it("reutiliza el token en memoria y no refresca en cada petición", async () => {
     const spy = stubFetch(
       tokenResponse({ id_token: "t1", refresh_token: "r2", expires_in: 3600 }),
     );
     const store: TokenStore = {
-      read: async () => "r1",
+      read: async () => ({ refreshToken: "r1", policy: null }),
       write: async () => {},
     };
     const session = new FantasySession(store);
@@ -194,9 +287,9 @@ describe("FantasySession", () => {
     stubFetch(
       tokenResponse({ id_token: "t1", refresh_token: "r2", expires_in: 3600 }),
     );
-    const escritos: string[] = [];
+    const escritos: StoredToken[] = [];
     const session = new FantasySession({
-      read: async () => "r1",
+      read: async () => ({ refreshToken: "r1", policy: null }),
       write: async (token) => {
         escritos.push(token);
       },
@@ -204,7 +297,41 @@ describe("FantasySession", () => {
 
     await session.getBearerToken();
 
-    expect(escritos).toEqual(["r2"]);
+    expect(escritos.map((e) => e.refreshToken)).toEqual(["r2"]);
+  });
+
+  it("refresca con la política que emitió el token, no con la de contraseña", async () => {
+    // Un refresh token de B2C está atado a su política: si el login fue
+    // interactivo y refrescamos con la de contraseña, falla en producción.
+    const spy = stubFetch(
+      tokenResponse({ id_token: "t1", refresh_token: "r2", expires_in: 3600 }),
+    );
+    const session = new FantasySession({
+      read: async () => ({ refreshToken: "r1", policy: "POLITICA_INTERACTIVA" }),
+      write: async () => {},
+    });
+
+    await session.getBearerToken();
+
+    const [url] = spy.mock.calls[0]! as unknown as [string];
+    expect(new URL(url).searchParams.get("p")).toBe("POLITICA_INTERACTIVA");
+  });
+
+  it("conserva la política al rotar el token", async () => {
+    stubFetch(
+      tokenResponse({ id_token: "t1", refresh_token: "r2", expires_in: 3600 }),
+    );
+    const escritos: StoredToken[] = [];
+    const session = new FantasySession({
+      read: async () => ({ refreshToken: "r1", policy: "POLITICA_INTERACTIVA" }),
+      write: async (token) => {
+        escritos.push(token);
+      },
+    });
+
+    await session.getBearerToken();
+
+    expect(escritos[0]?.policy).toBe("POLITICA_INTERACTIVA");
   });
 
   it("explica qué hacer cuando no hay refresh token guardado", async () => {
@@ -213,6 +340,6 @@ describe("FantasySession", () => {
       write: async () => {},
     });
 
-    await expect(session.getBearerToken()).rejects.toThrow(/--login/);
+    await expect(session.getBearerToken()).rejects.toThrow(/setup\/login/);
   });
 });

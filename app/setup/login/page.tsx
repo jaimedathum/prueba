@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LoginForm } from "./login-form";
+import { InteractiveLogin, PasswordLogin } from "./login-form";
 
 export const dynamic = "force-dynamic";
 
@@ -26,18 +26,20 @@ export default function LoginPage() {
         </p>
       </header>
 
-      <LoginForm />
+      <InteractiveLogin />
+      <PasswordLogin />
 
       <section className="space-y-2 text-sm text-neutral-500">
         <p>
-          Tu contraseña <strong>no se guarda</strong> ni aquí ni en las
+          Tus credenciales <strong>no se guardan</strong> ni aquí ni en las
           variables de entorno. Lo único que queda almacenado es el refresh
           token, cifrado con <code>TOKEN_ENCRYPTION_KEY</code>.
         </p>
         <p>
-          Si tu cuenta del juego es de Google, Apple o Facebook, esto fallará:
-          el login por contraseña solo sirve para cuentas locales. Está
-          explicado en <code>docs/reglas.md</code>.
+          El paso manual de copiar la URL de vuelta existe porque la dirección
+          de retorno registrada en LaLiga es la de su app móvil, y no está en
+          nuestra mano registrar otra. Está explicado en{" "}
+          <code>docs/reglas.md</code>.
         </p>
       </section>
     </main>
