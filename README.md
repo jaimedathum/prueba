@@ -26,7 +26,7 @@ del proyecto. Las reglas del juego confirmadas y las pendientes, en
 | 0 | Ingesta, snapshots, allowlist, overrides | hecho |
 | 1 | Caja de rivales + radar de cláusulas | hecho |
 | 2 | Puntos esperados + optimizador de alineación | hecho |
-| 3 | Subasta, modelo de precios y fichajes | pendiente |
+| 3 | Subasta, modelo de precios y fichajes | hecho |
 | 4 | Alertas por Telegram | pendiente |
 
 ## Los motores de la fase 1
@@ -162,6 +162,71 @@ La consecuencia es contraintuitiva y hay un test que la fija: **cuando ir sobre
 seguro es perder seguro, el once óptimo es el de más varianza**, aunque sume
 menos puntos esperados.
 
+## Los motores de la fase 3
+
+Se ejecutan en este orden y no es casual: el optimizador de fichajes produce el
+**coste real del euro**, y sin ese número la puja óptima estaría mal calculada.
+
+### Modelo de precios (`lib/engine/value.ts`)
+
+Predice el **retorno**, no el precio absoluto, y por **cuantiles, no por la
+media**: para decidir si especular no basta `E[r]`, hace falta `P(r < 0)`. Un
+modelo que solo da la media no permite gestionar riesgo, y sin gestión de
+riesgo la especulación es apostar.
+
+Regresión lineal regularizada con pérdida pinball. Con pocos datos bate a
+modelos más complejos, así que se empieza por ahí.
+
+**Se valida con separación temporal estricta** —entrenar con el pasado,
+predecir el futuro, sin mezclar fechas nunca— y tiene que **batir a la línea
+base ingenua** "mañana vale lo mismo que hoy". Si no la bate, la interfaz lo
+dice y desaconseja usarlo. Hay un test que comprueba que no finge habilidad
+cuando los datos son puro ruido.
+
+### Optimizador de fichajes (`lib/engine/transfers.ts`)
+
+Evalúa combinaciones de ventas y compras reoptimizando **la alineación entera**
+en cada una, porque los puntos que ganas o pierdes no son los del jugador sino
+los del once: vender a un suplente no cuesta puntos por bueno que sea.
+
+De aquí sale el **precio sombra del dinero**. Y aquí hay un detalle que importa:
+en un problema combinatorio el óptimo es una función escalonada de la caja, así
+que una diferencia finita pequeña daría cero justo cuando te falta poco para
+algo que vale mucho. Se mide en su lugar el **mejor rendimiento marginal
+disponible en el entorno**.
+
+### Subasta (`lib/engine/auction.ts`)
+
+```
+P(ganar | b)     = Π_i P(puja_i < b)
+E[excedente](b)  = P(ganar | b) · (V − c·b)
+```
+
+La pieza que ninguna web puede tener: **la distribución de pujas de cada rival**,
+aprendida del feed de tu propia liga. Unos pujan un 5% por encima del valor,
+otros un 40%. Con poco historial de un rival se mezcla con el de la liga
+entera, porque con dos observaciones no se puede afirmar que alguien sea
+conservador.
+
+Devuelve la curva completa para poder decidir "por 2M más subo del 55% al 80%",
+más los dos consejos que salen de las reglas: **pujar pronto** (los empates los
+gana el primero) y **pujar cifras no redondas**.
+
+### Especulación (`lib/engine/speculation.ts`)
+
+```
+b_max = max { b : E[valor_salida] ≥ c·b + coste_de_plaza  ∧  P(r < 0) ≤ tolerancia }
+```
+
+Comprar a alguien que nunca vas a alinear, solo porque va a subir. Tres cosas
+impiden que sea dinero gratis y las tres están dentro: el coste real del euro,
+el coste de ocupar una plaza, y la liquidez de salida.
+
+Incluye las reglas de salida —objetivo alcanzado, momentum agotado, stop de
+tesis, coste de oportunidad— y el **clausulazo como salida**: si la cláusula
+está por encima de lo que pagaste, que te lo quiten cierra la posición con
+beneficio y sin esperar.
+
 ## Solo lectura, por construcción
 
 La app **recomienda**; tú ejecutas en la app oficial. El cliente de la API solo
@@ -256,7 +321,7 @@ proyecciones.
 ## Desarrollo
 
 ```bash
-npm test          # 203 tests
+npm test          # 267 tests
 npm run typecheck
 npm run build
 ```
