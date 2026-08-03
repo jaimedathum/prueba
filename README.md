@@ -274,7 +274,7 @@ Además: uso personal, sin redistribución de datos, rate limiting secuencial, y
 ```bash
 npm install
 cp .env.example .env          # rellena DATABASE_URL y TOKEN_ENCRYPTION_KEY
-npm run db:migrate            # crea las 16 tablas
+npm run db:migrate            # crea las 19 tablas
 npm run sync -- --offline     # valida rutas sin credenciales ni red
 npm run sync -- --login       # login inicial; guarda el refresh token cifrado
 npm run sync -- --dry-run --shape
