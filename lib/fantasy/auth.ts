@@ -124,6 +124,12 @@ async function requestToken(
  * flujo interactivo (authorization code + PKCE), que todavía no está
  * implementado aquí.
  */
+export const SOCIAL_ACCOUNT_HINT =
+  "Si la contraseña es correcta, lo más probable es que tu cuenta del juego " +
+  "sea de Google, Apple o Facebook. El login por contraseña (ROPC) solo " +
+  "funciona con cuentas locales de email y contraseña; para las sociales hace " +
+  "falta el flujo interactivo, todavía sin implementar. Ver docs/reglas.md.";
+
 export async function loginWithPassword(
   email: string,
   password: string,

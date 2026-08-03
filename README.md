@@ -274,13 +274,17 @@ Además: uso personal, sin redistribución de datos, rate limiting secuencial, y
 ```bash
 npm install
 cp .env.example .env          # rellena DATABASE_URL y TOKEN_ENCRYPTION_KEY
-npm run db:migrate            # crea las 19 tablas
+npm run db:deploy             # crea las 19 tablas
 npm run sync -- --offline     # valida rutas sin credenciales ni red
 npm run sync -- --login       # login inicial; guarda el refresh token cifrado
 npm run sync -- --dry-run --shape
 npm run sync                  # sincroniza de verdad
 npm run dev
 ```
+
+**Sin terminal también se puede.** Desplegado en Vercel, las migraciones se
+aplican solas en cada build y el login inicial se hace desde
+`/setup/login`. Ver [`docs/despliegue.md`](docs/despliegue.md).
 
 `--dry-run` lee de la API pero **no escribe nada**. `--shape` añade el informe
 de mapeo de campos: qué no se encontró (hay que corregir el parser) y qué llega
