@@ -23,7 +23,11 @@ export default function LoginPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Login inicial</h1>
         <p className="text-sm text-neutral-500">
-          Se hace una sola vez. Después el despliegue refresca la sesión solo.
+          Paso 2 de 3, y se hace una sola vez. Al terminar queda{" "}
+          <a className="underline" href="/setup">
+            traer los primeros datos
+          </a>
+          : con la sesión iniciada la base sigue vacía hasta que se sincroniza.
         </p>
       </header>
 
