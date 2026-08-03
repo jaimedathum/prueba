@@ -26,13 +26,23 @@ function getKey(): Buffer {
   const hex = process.env.TOKEN_ENCRYPTION_KEY;
   if (!hex) {
     throw new Error(
-      'Falta TOKEN_ENCRYPTION_KEY. Genérala con: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+      "Falta TOKEN_ENCRYPTION_KEY: el servidor no la ve.\n\n" +
+        "Si crees que sí está configurada, casi siempre es una de estas dos: " +
+        "se añadió después del último despliegue (las variables de entorno " +
+        "solo entran en builds nuevos, hay que redesplegar), o no está " +
+        "marcada para este entorno (una variable solo de Production no existe " +
+        "en la URL de preview).\n\n" +
+        "Para generar una: en la consola del navegador, " +
+        "crypto.randomUUID().replaceAll('-','').repeat(2) — o con Node, " +
+        "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
     );
   }
   const key = Buffer.from(hex, "hex");
   if (key.length !== KEY_BYTES) {
     throw new Error(
-      `TOKEN_ENCRYPTION_KEY debe tener ${KEY_BYTES} bytes en hex (${KEY_BYTES * 2} caracteres), tiene ${key.length}`,
+      `TOKEN_ENCRYPTION_KEY debe tener ${KEY_BYTES} bytes en hex ` +
+        `(${KEY_BYTES * 2} caracteres hexadecimales), y la que hay son ${key.length} bytes. ` +
+        "Revisa que no lleve comillas ni espacios de más.",
     );
   }
   return key;
