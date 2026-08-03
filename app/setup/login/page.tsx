@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { checkSetupEnv } from "@/lib/setup-status";
 import { InteractiveLogin, PasswordLogin } from "./login-form";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default function LoginPage() {
         </p>
       </header>
 
+      <EnvPanel />
       <InteractiveLogin />
       <PasswordLogin />
 
@@ -43,5 +45,51 @@ export default function LoginPage() {
         </p>
       </section>
     </main>
+  );
+}
+
+/**
+ * Qué ve el servidor que atiende esta petición.
+ *
+ * "La tengo configurada en Vercel" y "el proceso la ve" no son lo mismo: una
+ * variable añadida después del último build, o marcada solo para Production
+ * mientras se navega por la URL de preview, falla igual que si no existiera.
+ * Esto lo convierte en un dato en vez de una conjetura.
+ */
+function EnvPanel() {
+  const checks = checkSetupEnv();
+  const faltan = checks.filter((check) => !check.ok);
+
+  if (faltan.length === 0) {
+    return (
+      <p className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+        Configuración correcta: el servidor ve las tres variables que hacen
+        falta.
+      </p>
+    );
+  }
+
+  return (
+    <section className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+      <p className="font-medium">
+        Falta configuración. El login va a fallar hasta que se arregle.
+      </p>
+
+      <ul className="space-y-1">
+        {checks.map((check) => (
+          <li key={check.name}>
+            {check.ok ? "✓" : "✗"} <code>{check.name}</code> — {check.detail}
+          </li>
+        ))}
+      </ul>
+
+      <p>
+        Si juras que están puestas, casi siempre es una de estas dos:{" "}
+        <strong>se añadieron después del último despliegue</strong> —las
+        variables solo entran en builds nuevos, hay que redesplegar—, o{" "}
+        <strong>no están marcadas para este entorno</strong>: una variable solo
+        de Production no existe en la URL de preview.
+      </p>
+    </section>
   );
 }
