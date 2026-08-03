@@ -413,6 +413,25 @@ export const syncRuns = pgTable(
 );
 
 /**
+ * Alertas ya enviadas.
+ *
+ * Existe para que la app no se vuelva ruido. Una alerta que llega todos los
+ * días se deja de leer, y entonces la que importa de verdad pasa desapercibida:
+ * cada aviso se manda una vez y no se repite hasta que expira su enfriamiento.
+ */
+export const sentAlerts = pgTable(
+  "sent_alerts",
+  {
+    /** Clave estable del aviso: mismo problema, misma clave. */
+    key: text("key").primaryKey(),
+    kind: text("kind").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    body: text("body").notNull(),
+  },
+  (t) => [index("sent_alerts_sent_idx").on(t.sentAt)],
+);
+
+/**
  * Diario de decisiones: cada recomendación y lo que pasó después.
  * Es lo que permite mostrar acierto medido en vez de promesas.
  */

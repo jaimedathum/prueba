@@ -27,7 +27,7 @@ del proyecto. Las reglas del juego confirmadas y las pendientes, en
 | 1 | Caja de rivales + radar de cláusulas | hecho |
 | 2 | Puntos esperados + optimizador de alineación | hecho |
 | 3 | Subasta, modelo de precios y fichajes | hecho |
-| 4 | Alertas por Telegram | pendiente |
+| 4 | Alertas por Telegram | hecho |
 
 ## Los motores de la fase 1
 
@@ -227,6 +227,32 @@ tesis, coste de oportunidad— y el **clausulazo como salida**: si la cláusula
 está por encima de lo que pagaste, que te lo quiten cierra la posición con
 beneficio y sin esperar.
 
+## Alertas (fase 4)
+
+`GET /api/cron/alerts`, pensado para dispararse un rato antes del cierre de
+mercado. Es independiente de la sincronización a propósito: si la ingesta
+falla, este job sigue corriendo y precisamente eso es lo primero de lo que
+avisa.
+
+El criterio de diseño es uno solo: **si no hay nada accionable, no manda
+nada**. Una app que avisa todos los días se deja de leer, y entonces el aviso
+que de verdad importaba pasa desapercibido.
+
+- **Umbral de prioridad**: solo interrumpe lo alto y lo medio. Un chollo
+  especulativo es prioridad baja y nunca llega al móvil — si se pasa la
+  oportunidad, no pasa nada.
+- **Enfriamiento por tipo**: un riesgo de cláusula sigue ahí mañana y no hace
+  falta recordarlo cada día (48h); una puja caduca con el mercado y conviene
+  repetirla mientras siga viva (20h).
+- **Claves estables**: la de una puja incluye el día, la de un riesgo de
+  cláusula no, y la de un movimiento identifica la operación. Así cada aviso
+  se repite exactamente con la frecuencia que merece.
+- Lo enviado se registra **solo tras un envío correcto**: si Telegram falla, se
+  reintenta mañana en vez de dar por avisado algo que nunca llegó.
+
+`?dry-run=1` compone el mensaje y lo devuelve sin enviarlo, para ajustar
+umbrales sin llenarte el móvil de pruebas.
+
 ## Solo lectura, por construcción
 
 La app **recomienda**; tú ejecutas en la app oficial. El cliente de la API solo
@@ -321,7 +347,7 @@ proyecciones.
 ## Desarrollo
 
 ```bash
-npm test          # 267 tests
+npm test          # 287 tests
 npm run typecheck
 npm run build
 ```
