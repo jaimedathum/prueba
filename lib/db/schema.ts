@@ -391,6 +391,13 @@ export const authTokens = pgTable("auth_tokens", {
   encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
   iv: text("iv").notNull(),
   authTag: text("auth_tag").notNull(),
+  /**
+   * Política de B2C que emitió el token. Un refresh token está atado a su
+   * política: refrescarlo con otra falla. Como el login por contraseña y el
+   * interactivo usan políticas distintas, hay que recordar cuál fue.
+   * Nullable por las filas anteriores a esta columna, que son de contraseña.
+   */
+  policy: text("policy"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

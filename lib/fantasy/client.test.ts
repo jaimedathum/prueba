@@ -6,7 +6,7 @@ import { endpoints } from "./endpoints";
 /** Sesión de mentira: los tests no tocan ni la red de auth ni la base de datos. */
 function fakeSession(): FantasySession {
   const store: TokenStore = {
-    read: async () => "refresh",
+    read: async () => ({ refreshToken: "refresh", policy: null }),
     write: async () => {},
   };
   const session = new FantasySession(store);

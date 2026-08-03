@@ -1,11 +1,17 @@
 "use server";
 
+import { cookies } from "next/headers";
 import {
   FantasySession,
   SOCIAL_ACCOUNT_HINT,
+  buildAuthorizeUrl,
+  createPkcePair,
+  exchangeAuthorizationCode,
+  extractAuthorizationCode,
+  getInteractiveConfig,
   loginWithPassword,
 } from "@/lib/fantasy/auth";
-import { safeEqual } from "@/lib/fantasy/crypto";
+import { decryptToken, encryptToken, safeEqual } from "@/lib/fantasy/crypto";
 
 /**
  * Login inicial desde el navegador.
@@ -15,16 +21,20 @@ import { safeEqual } from "@/lib/fantasy/crypto";
  * Vercel y GitHub. Corriendo dentro del despliegue hay salida a LaLiga y a la
  * base de datos, que es justo lo que hace falta.
  *
- * Tres decisiones de seguridad:
+ * Hay dos caminos porque el juego admite dos tipos de cuenta:
  *
- * - **Las credenciales no se guardan en ningún sitio.** Llegan por el formulario,
- *   se usan para pedir el token y se van con la petición. En particular NO hay
- *   que subirlas como variables de entorno a Vercel; lo único que queda es el
- *   refresh token, cifrado en Postgres.
- * - **La acción va protegida por `CRON_SECRET`**, comparado en tiempo constante.
- *   Es una URL pública: sin esto, cualquiera podría usarla como oráculo de
- *   login contra LaLiga.
- * - **Nunca se registra ni se devuelve el token**, ni la contraseña.
+ * - **Contraseña (ROPC)**: solo sirve para cuentas locales.
+ * - **Interactivo (authorization code + PKCE)**: el único que vale para
+ *   Google, Apple o Facebook.
+ *
+ * Tres decisiones de seguridad comunes a ambos:
+ *
+ * - **Las credenciales no se guardan en ningún sitio.** En el interactivo ni
+ *   siquiera pasan por aquí: se tecleen donde se tecleen, es en LaLiga.
+ * - **Las acciones van protegidas por `CRON_SECRET`**, comparado en tiempo
+ *   constante. Es una URL pública: sin esto, cualquiera podría usarla como
+ *   oráculo de login contra LaLiga.
+ * - **Nunca se registra ni se devuelve el token.**
  *
  * Esto no rompe la garantía de solo-lectura: sigue sin haber ninguna ruta que
  * puje, clausule ni blinde. La allowlist de `lib/fantasy/endpoints.ts` no se
@@ -34,16 +44,15 @@ import { safeEqual } from "@/lib/fantasy/crypto";
 export interface LoginState {
   ok: boolean;
   message: string;
+  /** Presente solo al arrancar el flujo interactivo. */
+  authorizeUrl?: string;
 }
 
-export async function loginAction(
-  _previous: LoginState | null,
-  formData: FormData,
-): Promise<LoginState> {
-  const secret = String(formData.get("secret") ?? "");
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
+const VERIFIER_COOKIE = "fa_pkce";
+/** El usuario tiene que ir a LaLiga y volver; 15 minutos sobran. */
+const VERIFIER_TTL_SECONDS = 15 * 60;
 
+function authorize(formData: FormData): LoginState | null {
   const expected = process.env.CRON_SECRET;
   if (!expected) {
     return {
@@ -53,12 +62,24 @@ export async function loginAction(
         "Vercel → Settings → Environment Variables y vuelve a desplegar.",
     };
   }
-
-  if (!safeEqual(secret, expected)) {
+  if (!safeEqual(String(formData.get("secret") ?? ""), expected)) {
     // Mensaje genérico a propósito: no confirma si el secreto existe.
     return { ok: false, message: "Secreto incorrecto." };
   }
+  return null;
+}
 
+/* ---------------------------- contraseña ---------------------------- */
+
+export async function loginAction(
+  _previous: LoginState | null,
+  formData: FormData,
+): Promise<LoginState> {
+  const denied = authorize(formData);
+  if (denied) return denied;
+
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
   if (!email || !password) {
     return { ok: false, message: "Faltan el email o la contraseña." };
   }
@@ -75,7 +96,118 @@ export async function loginAction(
     ok: true,
     message:
       "Sesión iniciada. El refresh token ya está guardado cifrado en la base " +
-      "de datos. Tu contraseña no se ha almacenado en ningún sitio: a partir " +
-      "de ahora el despliegue se refresca solo.",
+      "de datos. Tu contraseña no se ha almacenado en ningún sitio.",
+  };
+}
+
+/* ---------------------------- interactivo --------------------------- */
+
+/**
+ * Paso 1: genera el par PKCE y devuelve la URL de LaLiga.
+ *
+ * El verifier viaja en una cookie httpOnly y **cifrado** con la misma clave
+ * que el refresh token. Podría ir en claro —solo sirve junto al código, que lo
+ * tiene el usuario— pero teniendo ya la primitiva, no cifrarlo sería gratuito
+ * solo para el atacante.
+ */
+export async function startInteractiveLogin(
+  _previous: LoginState | null,
+  formData: FormData,
+): Promise<LoginState> {
+  const denied = authorize(formData);
+  if (denied) return denied;
+
+  const { verifier, challenge } = createPkcePair();
+  const encrypted = encryptToken(verifier);
+
+  (await cookies()).set(
+    VERIFIER_COOKIE,
+    JSON.stringify(encrypted),
+    {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: VERIFIER_TTL_SECONDS,
+      path: "/setup/login",
+    },
+  );
+
+  return {
+    ok: true,
+    authorizeUrl: buildAuthorizeUrl(challenge),
+    message:
+      "Abre el enlace, identifícate con tu proveedor y vuelve aquí con la URL " +
+      "de destino. Tienes 15 minutos.",
+  };
+}
+
+/** Paso 2: canjea el código que ha pegado el usuario. */
+export async function completeInteractiveLogin(
+  _previous: LoginState | null,
+  formData: FormData,
+): Promise<LoginState> {
+  const denied = authorize(formData);
+  if (denied) return denied;
+
+  const jar = await cookies();
+  const stored = jar.get(VERIFIER_COOKIE)?.value;
+  if (!stored) {
+    return {
+      ok: false,
+      message:
+        "No hay un login interactivo en curso, o han pasado más de 15 " +
+        "minutos. Vuelve a empezar por el paso 1.",
+    };
+  }
+
+  let verifier: string;
+  try {
+    verifier = decryptToken(JSON.parse(stored));
+  } catch {
+    return {
+      ok: false,
+      message: "El login en curso no se puede leer. Empieza otra vez por el paso 1.",
+    };
+  }
+
+  let code: string | null;
+  try {
+    code = extractAuthorizationCode(String(formData.get("redirected") ?? ""));
+  } catch (error) {
+    // B2C devuelve el motivo real en la URL cuando el login falla.
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  if (!code) {
+    return {
+      ok: false,
+      message:
+        "No se ha encontrado ningún código ahí. Pega la URL entera a la que " +
+        "te redirigió LaLiga, la que empieza por authredirect://",
+    };
+  }
+
+  try {
+    const tokens = await exchangeAuthorizationCode(code, verifier);
+    await new FantasySession().adopt(tokens, getInteractiveConfig().policy);
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  // El verifier ya no vale para nada: fuera.
+  jar.delete(VERIFIER_COOKIE);
+
+  return {
+    ok: true,
+    message:
+      "Sesión iniciada. El refresh token está guardado cifrado en la base de " +
+      "datos, junto con la política que lo emitió para poder refrescarlo. A " +
+      "partir de ahora el despliegue se mantiene solo.",
   };
 }
