@@ -1,7 +1,111 @@
 "use client";
 
 import { useActionState } from "react";
-import { runSyncAction, type SyncState } from "./actions";
+import {
+  diagnoseAction,
+  runSyncAction,
+  type DiagnosisState,
+  type SyncState,
+} from "./actions";
+
+/**
+ * Diagnóstico de la API. Aparece aparte de la sincronización porque se usa
+ * justo cuando esa falla: un 404 no dice si sobra o falta un prefijo en la
+ * URL base o si el identificador de competición no es el que toca.
+ */
+export function DiagnoseForm() {
+  const [state, formAction, pending] = useActionState<
+    DiagnosisState | null,
+    FormData
+  >(diagnoseAction, null);
+
+  return (
+    <section className="space-y-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+      <header>
+        <h2 className="font-medium">Diagnosticar la API</h2>
+        <p className="text-sm text-neutral-500">
+          Si la sincronización falla con un 404 o un 401, esto dice dónde está
+          el problema en vez de dejarte probando a ciegas.
+        </p>
+      </header>
+
+      <form action={formAction} className="space-y-3">
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Secreto del despliegue</span>
+          <input
+            name="secret"
+            type="password"
+            required
+            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium disabled:opacity-50 dark:border-neutral-700"
+        >
+          {pending ? "Probando…" : "Diagnosticar"}
+        </button>
+      </form>
+
+      {state && (
+        <div className="space-y-3">
+          <pre
+            className={`overflow-x-auto whitespace-pre-wrap rounded-lg border p-3 text-sm ${
+              state.ok
+                ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+            }`}
+          >
+            {state.message}
+          </pre>
+
+          {state.results && state.results.length > 0 && (
+            <table className="w-full text-left text-xs">
+              <thead className="text-neutral-500">
+                <tr>
+                  <th className="py-1">Base</th>
+                  <th className="py-1">Ruta</th>
+                  <th className="py-1 text-right">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.results.map((result, index) => (
+                  <tr
+                    key={`${result.base}${result.path}${index}`}
+                    className="border-t border-neutral-200 dark:border-neutral-800"
+                  >
+                    <td className="break-all py-1 pr-2">{result.base}</td>
+                    <td className="break-all py-1 pr-2">{result.path}</td>
+                    <td className="py-1 text-right tabular-nums">
+                      {result.status ?? result.error ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {state.me && (
+            <details className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+              <summary className="cursor-pointer font-medium">
+                Tu usuario, según la API
+              </summary>
+              <p className="mt-1 text-xs text-neutral-500">
+                Aquí dentro están los identificadores de tu liga y de tu equipo,
+                que son los que hay que poner en <code>FANTASY_LEAGUE_ID</code> y{" "}
+                <code>FANTASY_TEAM_ID</code>.
+              </p>
+              <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap text-xs">
+                {state.me}
+              </pre>
+            </details>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
 /**
  * Disparador manual de la sincronización. El resultado se enseña entero

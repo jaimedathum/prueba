@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { checkSetupEnv } from "@/lib/setup-status";
-import { SyncForm } from "./sync-form";
+import { DiagnoseForm, SyncForm } from "./sync-form";
 
 export const dynamic = "force-dynamic";
 /** La sincronización va en serie y con pausas: necesita margen. */
@@ -66,6 +66,8 @@ export default function SetupPage() {
         <h2 className="sr-only">3. Datos</h2>
         <SyncForm />
       </div>
+
+      <DiagnoseForm />
 
       <p className="text-sm text-neutral-500">
         La sincronización solo <strong>lee</strong>. No hay ninguna ruta que
