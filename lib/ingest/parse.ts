@@ -190,6 +190,87 @@ export function parseMarketListing(raw: unknown): {
   };
 }
 
+export interface ParsedMatch {
+  id: string;
+  matchday: number;
+  homeTeamId: string;
+  awayTeamId: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  kickoffAt: Date | null;
+  finished: boolean;
+}
+
+export function parseMatch(
+  raw: unknown,
+  matchday: number,
+): { match: ParsedMatch | null; mapper: FieldMapper } {
+  const source: Json = isJsonObject(raw) ? raw : {};
+  const m = new FieldMapper(source, "match");
+
+  const homeTeamId = m.string("local.id", "homeTeam.id", "localTeamId");
+  const awayTeamId = m.string("visitor.id", "awayTeam.id", "visitorTeamId");
+  if (!homeTeamId || !awayTeamId) return { match: null, mapper: m };
+
+  const homeGoals = m.number("localScore", "homeGoals", "local.score");
+  const awayGoals = m.number("visitorScore", "awayGoals", "visitor.score");
+  const state = m.string("matchState", "state", "status");
+
+  return {
+    match: {
+      id:
+        m.string("id", "matchId") ??
+        deterministicId([matchday, homeTeamId, awayTeamId]),
+      matchday,
+      homeTeamId,
+      awayTeamId,
+      homeGoals,
+      awayGoals,
+      kickoffAt: m.date("date", "matchDate", "kickoff"),
+      // Un partido cuenta para el modelo solo si tiene resultado: un 0-0 sin
+      // jugar y un 0-0 real no son lo mismo.
+      finished:
+        homeGoals !== null &&
+        awayGoals !== null &&
+        (state === null || /final|finish|played|jugado/i.test(state)),
+    },
+    mapper: m,
+  };
+}
+
+export interface ParsedPlayerMatchStat {
+  playerId: string;
+  minutes: number | null;
+  points: number | null;
+  started: boolean | null;
+}
+
+export function parsePlayerMatchStat(raw: unknown): {
+  stat: ParsedPlayerMatchStat | null;
+  mapper: FieldMapper;
+} {
+  const source: Json = isJsonObject(raw) ? raw : {};
+  const m = new FieldMapper(source, "playerMatchStat");
+
+  const playerId = m.string("playerId", "player.id", "id");
+  if (!playerId) return { stat: null, mapper: m };
+
+  const minutes = m.number("mins_played", "minutesPlayed", "minutes");
+  const started = m.boolean("isStarter", "starter", "titular");
+
+  return {
+    stat: {
+      playerId,
+      minutes,
+      points: m.number("totalPoints", "points", "weekPoints"),
+      // Sin dato explícito, se infiere de los minutos: quien juega mucho
+      // casi siempre ha salido de inicio.
+      started: started ?? (minutes !== null ? minutes >= 60 : null),
+    },
+    mapper: m,
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Feed de actividad
  * ------------------------------------------------------------------ */

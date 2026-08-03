@@ -25,9 +25,9 @@ del proyecto. Las reglas del juego confirmadas y las pendientes, en
 |---|---|---|
 | 0 | Ingesta, snapshots, allowlist, overrides | hecho |
 | 1 | Caja de rivales + radar de cláusulas | hecho |
-| 2 | Puntos esperados + optimizador de alineación | pendiente |
-| 3 | Subasta, modelo de precios y fichajes | pendiente |
-| 4 | Alertas por Telegram | pendiente |
+| 2 | Puntos esperados + optimizador de alineación | hecho |
+| 3 | Subasta, modelo de precios y fichajes | hecho |
+| 4 | Alertas por Telegram | hecho |
 
 ## Los motores de la fase 1
 
@@ -99,6 +99,159 @@ sube la exposición de tu propia plantilla. Si el agujero que abre supera la
 ganancia, la recomendación es negativa aunque el jugador esté "barato".
 
 ---
+
+## Los motores de la fase 2
+
+### Modelo de equipos (`lib/engine/team-model.ts`)
+
+Dixon-Coles ajustado por máxima verosimilitud sobre los resultados reales, con
+decaimiento temporal:
+
+```
+λ_local     = exp(μ + ataque_local     + defensa_visitante + ventaja_local)
+λ_visitante = exp(μ + ataque_visitante + defensa_local)
+```
+
+Sustituye la típica "dificultad del rival del 1 al 5" por números con
+significado, y da directamente `P(portería a cero)`, que es lo que más pesa en
+los puntos de porteros y defensas.
+
+Hay un test que exige que **bata a la línea base** "todos los equipos iguales
+con la media de goles de la liga". Si no la batiera, no habría motivo para
+usarlo.
+
+### Puntos esperados (`lib/engine/expected-points.ts`)
+
+```
+EP = P(titular) · E[puntos | titular] + P(suplente) · E[puntos | suplente]
+```
+
+Tres decisiones que marcan la diferencia:
+
+1. **No se modelan puntos, se modelan minutos.** El 80% de la varianza es
+   "¿juega?". Un crack que no es titular vale cero, y el motor lo refleja.
+2. **Shrinkage bayesiano** hacia la media de la posición:
+   `r̂ = (n·r + k·r_pos) / (n + k)`. Sin eso, dos partidazos disparan la
+   proyección de un jugador que en realidad es del montón.
+3. El ajuste por rival reparte los puntos entre la parte que depende de no
+   encajar y la que depende de atacar, y escala cada una con el modelo de
+   equipos. A un portero le importa la portería a cero; a un delantero, los
+   goles esperados.
+
+Lesión y sanción son **puertas duras**, y no solo para la titularidad: un
+lesionado tampoco entra desde el banquillo.
+
+Este motor **no necesita el baremo de puntuación** del juego —que no está
+confirmado— porque trabaja con los puntos fantasy históricos que ya da la API.
+
+### Optimizador de alineación (`lib/engine/lineup.ts`)
+
+**Modo valor esperado — exacto.** Se enumeran todas las formaciones legales y
+dentro de cada una se asigna con **flujo de coste mínimo**. Cuando cada jugador
+solo puede ocupar su posición esto equivale a coger los N mejores de cada una;
+la gracia es que si hay jugadores versátiles el problema deja de ser separable
+y el algoritmo sigue dando el óptimo sin cambiar nada.
+
+**Modo contra un rival — simulación.** Maximizar `P(superar al rival)` no se
+resuelve con medias. Se simula con Monte Carlo, remuestreando el histórico de
+cada jugador cuando lo hay en vez de suponer una forma de distribución, y se
+busca por intercambios de un jugador. **No garantiza el óptimo global**, y así
+está dicho en el código.
+
+La consecuencia es contraintuitiva y hay un test que la fija: **cuando ir sobre
+seguro es perder seguro, el once óptimo es el de más varianza**, aunque sume
+menos puntos esperados.
+
+## Los motores de la fase 3
+
+Se ejecutan en este orden y no es casual: el optimizador de fichajes produce el
+**coste real del euro**, y sin ese número la puja óptima estaría mal calculada.
+
+### Modelo de precios (`lib/engine/value.ts`)
+
+Predice el **retorno**, no el precio absoluto, y por **cuantiles, no por la
+media**: para decidir si especular no basta `E[r]`, hace falta `P(r < 0)`. Un
+modelo que solo da la media no permite gestionar riesgo, y sin gestión de
+riesgo la especulación es apostar.
+
+Regresión lineal regularizada con pérdida pinball. Con pocos datos bate a
+modelos más complejos, así que se empieza por ahí.
+
+**Se valida con separación temporal estricta** —entrenar con el pasado,
+predecir el futuro, sin mezclar fechas nunca— y tiene que **batir a la línea
+base ingenua** "mañana vale lo mismo que hoy". Si no la bate, la interfaz lo
+dice y desaconseja usarlo. Hay un test que comprueba que no finge habilidad
+cuando los datos son puro ruido.
+
+### Optimizador de fichajes (`lib/engine/transfers.ts`)
+
+Evalúa combinaciones de ventas y compras reoptimizando **la alineación entera**
+en cada una, porque los puntos que ganas o pierdes no son los del jugador sino
+los del once: vender a un suplente no cuesta puntos por bueno que sea.
+
+De aquí sale el **precio sombra del dinero**. Y aquí hay un detalle que importa:
+en un problema combinatorio el óptimo es una función escalonada de la caja, así
+que una diferencia finita pequeña daría cero justo cuando te falta poco para
+algo que vale mucho. Se mide en su lugar el **mejor rendimiento marginal
+disponible en el entorno**.
+
+### Subasta (`lib/engine/auction.ts`)
+
+```
+P(ganar | b)     = Π_i P(puja_i < b)
+E[excedente](b)  = P(ganar | b) · (V − c·b)
+```
+
+La pieza que ninguna web puede tener: **la distribución de pujas de cada rival**,
+aprendida del feed de tu propia liga. Unos pujan un 5% por encima del valor,
+otros un 40%. Con poco historial de un rival se mezcla con el de la liga
+entera, porque con dos observaciones no se puede afirmar que alguien sea
+conservador.
+
+Devuelve la curva completa para poder decidir "por 2M más subo del 55% al 80%",
+más los dos consejos que salen de las reglas: **pujar pronto** (los empates los
+gana el primero) y **pujar cifras no redondas**.
+
+### Especulación (`lib/engine/speculation.ts`)
+
+```
+b_max = max { b : E[valor_salida] ≥ c·b + coste_de_plaza  ∧  P(r < 0) ≤ tolerancia }
+```
+
+Comprar a alguien que nunca vas a alinear, solo porque va a subir. Tres cosas
+impiden que sea dinero gratis y las tres están dentro: el coste real del euro,
+el coste de ocupar una plaza, y la liquidez de salida.
+
+Incluye las reglas de salida —objetivo alcanzado, momentum agotado, stop de
+tesis, coste de oportunidad— y el **clausulazo como salida**: si la cláusula
+está por encima de lo que pagaste, que te lo quiten cierra la posición con
+beneficio y sin esperar.
+
+## Alertas (fase 4)
+
+`GET /api/cron/alerts`, pensado para dispararse un rato antes del cierre de
+mercado. Es independiente de la sincronización a propósito: si la ingesta
+falla, este job sigue corriendo y precisamente eso es lo primero de lo que
+avisa.
+
+El criterio de diseño es uno solo: **si no hay nada accionable, no manda
+nada**. Una app que avisa todos los días se deja de leer, y entonces el aviso
+que de verdad importaba pasa desapercibido.
+
+- **Umbral de prioridad**: solo interrumpe lo alto y lo medio. Un chollo
+  especulativo es prioridad baja y nunca llega al móvil — si se pasa la
+  oportunidad, no pasa nada.
+- **Enfriamiento por tipo**: un riesgo de cláusula sigue ahí mañana y no hace
+  falta recordarlo cada día (48h); una puja caduca con el mercado y conviene
+  repetirla mientras siga viva (20h).
+- **Claves estables**: la de una puja incluye el día, la de un riesgo de
+  cláusula no, y la de un movimiento identifica la operación. Así cada aviso
+  se repite exactamente con la frecuencia que merece.
+- Lo enviado se registra **solo tras un envío correcto**: si Telegram falla, se
+  reintenta mañana en vez de dar por avisado algo que nunca llegó.
+
+`?dry-run=1` compone el mensaje y lo devuelve sin enviarlo, para ajustar
+umbrales sin llenarte el móvil de pruebas.
 
 ## Solo lectura, por construcción
 
@@ -194,7 +347,7 @@ proyecciones.
 ## Desarrollo
 
 ```bash
-npm test          # 143 tests
+npm test          # 287 tests
 npm run typecheck
 npm run build
 ```

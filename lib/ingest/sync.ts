@@ -5,6 +5,8 @@ import {
   managerSnapshots,
   managers,
   marketListings,
+  matches,
+  playerMatchStats,
   playerValueSnapshots,
   players,
   realTeams,
@@ -19,7 +21,9 @@ import {
   parseActivityEvent,
   parseManager,
   parseMarketListing,
+  parseMatch,
   parsePlayer,
+  parsePlayerMatchStat,
   parseRosterEntry,
 } from "./parse";
 import { RawRecorder } from "./raw";
@@ -431,6 +435,95 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
               playerId: sql`excluded.player_id`,
             },
           });
+      }
+    }
+
+    /* --- 6b. Calendario y estadísticas por jornada ------------------ */
+    // Sin resultados reales no hay modelo de equipos, y sin él los puntos
+    // esperados pierden el ajuste por rival y la portería a cero.
+    const weekPayload = await client.get(endpoints.currentWeek());
+    const currentWeek =
+      (weekPayload as Record<string, unknown> | null)?.["weekNumber"] ??
+      (weekPayload as Record<string, unknown> | null)?.["week"] ??
+      null;
+    const lastWeek =
+      typeof currentWeek === "number"
+        ? currentWeek
+        : Number(currentWeek) || null;
+
+    if (lastWeek === null) {
+      warnings.push(
+        "No se ha podido determinar la jornada actual: no se sincronizan " +
+          "resultados ni estadísticas, y el modelo de equipos se queda sin datos.",
+      );
+    } else {
+      const parsedMatches = [];
+      for (let week = 1; week <= lastWeek; week++) {
+        const payload = await client.get(endpoints.calendar(), {
+          weekNumber: week,
+        });
+        for (const raw of asArray(payload)) {
+          const { match, mapper } = parseMatch(raw, week);
+          shape?.add("match", mapper);
+          if (match) parsedMatches.push(match);
+        }
+      }
+      stats.matches = parsedMatches.length;
+      stats.matchesFinished = parsedMatches.filter((m) => m.finished).length;
+      log(
+        `Partidos: ${parsedMatches.length} (${stats.matchesFinished} con resultado)`,
+      );
+
+      if (db && parsedMatches.length > 0) {
+        for (const batch of chunk(parsedMatches)) {
+          await db
+            .insert(matches)
+            .values(batch)
+            .onConflictDoUpdate({
+              target: matches.id,
+              set: {
+                homeGoals: sql`excluded.home_goals`,
+                awayGoals: sql`excluded.away_goals`,
+                kickoffAt: sql`excluded.kickoff_at`,
+                finished: sql`excluded.finished`,
+              },
+            });
+        }
+      }
+
+      // Estadísticas solo de jornadas ya jugadas: las futuras no tienen nada.
+      const playedWeeks = [
+        ...new Set(parsedMatches.filter((m) => m.finished).map((m) => m.matchday)),
+      ].sort((a, b) => a - b);
+
+      const statRows = [];
+      for (const week of playedWeeks) {
+        const payload = await client.get(endpoints.weekStats(week));
+        for (const raw of asArray(payload)) {
+          const { stat, mapper } = parsePlayerMatchStat(raw);
+          shape?.add("playerMatchStat", mapper);
+          if (stat && playerIds.has(stat.playerId)) {
+            statRows.push({ ...stat, matchday: week });
+          }
+        }
+      }
+      stats.playerMatchStats = statRows.length;
+      log(`Estadísticas por jornada: ${statRows.length} registros`);
+
+      if (db && statRows.length > 0) {
+        for (const batch of chunk(statRows)) {
+          await db
+            .insert(playerMatchStats)
+            .values(batch)
+            .onConflictDoUpdate({
+              target: [playerMatchStats.playerId, playerMatchStats.matchday],
+              set: {
+                minutes: sql`excluded.minutes`,
+                points: sql`excluded.points`,
+                started: sql`excluded.started`,
+              },
+            });
+        }
       }
     }
 
