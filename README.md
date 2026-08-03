@@ -25,7 +25,7 @@ del proyecto. Las reglas del juego confirmadas y las pendientes, en
 |---|---|---|
 | 0 | Ingesta, snapshots, allowlist, overrides | hecho |
 | 1 | Caja de rivales + radar de cláusulas | hecho |
-| 2 | Puntos esperados + optimizador de alineación | pendiente |
+| 2 | Puntos esperados + optimizador de alineación | hecho |
 | 3 | Subasta, modelo de precios y fichajes | pendiente |
 | 4 | Alertas por Telegram | pendiente |
 
@@ -99,6 +99,68 @@ sube la exposición de tu propia plantilla. Si el agujero que abre supera la
 ganancia, la recomendación es negativa aunque el jugador esté "barato".
 
 ---
+
+## Los motores de la fase 2
+
+### Modelo de equipos (`lib/engine/team-model.ts`)
+
+Dixon-Coles ajustado por máxima verosimilitud sobre los resultados reales, con
+decaimiento temporal:
+
+```
+λ_local     = exp(μ + ataque_local     + defensa_visitante + ventaja_local)
+λ_visitante = exp(μ + ataque_visitante + defensa_local)
+```
+
+Sustituye la típica "dificultad del rival del 1 al 5" por números con
+significado, y da directamente `P(portería a cero)`, que es lo que más pesa en
+los puntos de porteros y defensas.
+
+Hay un test que exige que **bata a la línea base** "todos los equipos iguales
+con la media de goles de la liga". Si no la batiera, no habría motivo para
+usarlo.
+
+### Puntos esperados (`lib/engine/expected-points.ts`)
+
+```
+EP = P(titular) · E[puntos | titular] + P(suplente) · E[puntos | suplente]
+```
+
+Tres decisiones que marcan la diferencia:
+
+1. **No se modelan puntos, se modelan minutos.** El 80% de la varianza es
+   "¿juega?". Un crack que no es titular vale cero, y el motor lo refleja.
+2. **Shrinkage bayesiano** hacia la media de la posición:
+   `r̂ = (n·r + k·r_pos) / (n + k)`. Sin eso, dos partidazos disparan la
+   proyección de un jugador que en realidad es del montón.
+3. El ajuste por rival reparte los puntos entre la parte que depende de no
+   encajar y la que depende de atacar, y escala cada una con el modelo de
+   equipos. A un portero le importa la portería a cero; a un delantero, los
+   goles esperados.
+
+Lesión y sanción son **puertas duras**, y no solo para la titularidad: un
+lesionado tampoco entra desde el banquillo.
+
+Este motor **no necesita el baremo de puntuación** del juego —que no está
+confirmado— porque trabaja con los puntos fantasy históricos que ya da la API.
+
+### Optimizador de alineación (`lib/engine/lineup.ts`)
+
+**Modo valor esperado — exacto.** Se enumeran todas las formaciones legales y
+dentro de cada una se asigna con **flujo de coste mínimo**. Cuando cada jugador
+solo puede ocupar su posición esto equivale a coger los N mejores de cada una;
+la gracia es que si hay jugadores versátiles el problema deja de ser separable
+y el algoritmo sigue dando el óptimo sin cambiar nada.
+
+**Modo contra un rival — simulación.** Maximizar `P(superar al rival)` no se
+resuelve con medias. Se simula con Monte Carlo, remuestreando el histórico de
+cada jugador cuando lo hay en vez de suponer una forma de distribución, y se
+busca por intercambios de un jugador. **No garantiza el óptimo global**, y así
+está dicho en el código.
+
+La consecuencia es contraintuitiva y hay un test que la fija: **cuando ir sobre
+seguro es perder seguro, el once óptimo es el de más varianza**, aunque sume
+menos puntos esperados.
 
 ## Solo lectura, por construcción
 
@@ -194,7 +256,7 @@ proyecciones.
 ## Desarrollo
 
 ```bash
-npm test          # 143 tests
+npm test          # 203 tests
 npm run typecheck
 npm run build
 ```

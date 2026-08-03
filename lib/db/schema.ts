@@ -89,6 +89,50 @@ export const players = pgTable(
   ],
 );
 
+/**
+ * Partidos reales de LaLiga. Son la materia prima del modelo Dixon-Coles:
+ * sin resultados no hay fuerza de ataque y defensa, y sin eso no hay
+ * probabilidad de portería a cero, que es lo que más pesa en los puntos de
+ * porteros y defensas.
+ */
+export const matches = pgTable(
+  "matches",
+  {
+    id: text("id").primaryKey(),
+    matchday: integer("matchday").notNull(),
+    homeTeamId: text("home_team_id").notNull(),
+    awayTeamId: text("away_team_id").notNull(),
+    homeGoals: integer("home_goals"),
+    awayGoals: integer("away_goals"),
+    kickoffAt: timestamp("kickoff_at", { withTimezone: true }),
+    finished: boolean("finished").notNull().default(false),
+  },
+  (t) => [
+    index("matches_matchday_idx").on(t.matchday),
+    index("matches_teams_idx").on(t.homeTeamId, t.awayTeamId),
+  ],
+);
+
+/**
+ * Rendimiento de cada jugador en cada jornada. De aquí salen los minutos —que
+ * es lo que de verdad hay que modelar— y la racha de titularidades que sirve
+ * de reserva cuando ninguna fuente publica el once probable.
+ */
+export const playerMatchStats = pgTable(
+  "player_match_stats",
+  {
+    playerId: text("player_id").notNull(),
+    matchday: integer("matchday").notNull(),
+    minutes: integer("minutes"),
+    points: integer("points"),
+    started: boolean("started"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.playerId, t.matchday] }),
+    index("player_match_stats_matchday_idx").on(t.matchday),
+  ],
+);
+
 /** Participantes de la liga privada: tú y tus amigos. */
 export const managers = pgTable(
   "managers",
