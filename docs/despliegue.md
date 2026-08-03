@@ -47,16 +47,30 @@ parada casi todo el tiempo. El plan gratuito sobra.
 - `drizzle.config.ts` coge la **directa** para el DDL, y cae a `DATABASE_URL`
   cuando no hay una declarada, que es el caso de un Postgres local.
 
-### 2. Migraciones
+### 2. Migraciones: se aplican solas en cada despliegue
 
-No las ejecuta Vercel: se lanzan desde local contra la base remota.
+`npm run build` ejecuta `db:deploy` antes de compilar, así que **cada
+despliegue deja el esquema al día** sin que haya que hacer nada. También en los
+previews, que en Neon tienen su propia rama y arrancarían vacíos.
+
+Detalles que importan (`scripts/migrate.ts`):
+
+- Usa el migrador programático de `drizzle-orm`, que es dependencia de
+  producción, en vez de `drizzle-kit`, que es de desarrollo. Así no depende de
+  que el entorno de build conserve las devDependencies.
+- Usa la conexión **directa**, porque PgBouncer en modo transacción no lleva
+  bien el DDL.
+- Si no hay base de datos configurada **no falla: avisa y sigue**. Eso permite
+  colgarlo del `build` sin romper un `npm run build` en un portátil sin `.env`.
+- Si hay base pero la migración falla, **sí rompe el build**. Desplegar contra
+  un esquema viejo produce errores mucho peores de leer, del tipo
+  `relation "sync_runs" does not exist`.
+
+Con terminal, lo mismo a mano:
 
 ```bash
-DATABASE_URL_UNPOOLED="<la directa de Neon>" npm run db:migrate   # 19 tablas
+npm run db:deploy    # 19 tablas
 ```
-
-O, más cómodo, `vercel env pull .env.local` y renombrar. Lo único que no
-admite atajo es que **el DDL tiene que ir por la conexión directa**.
 
 ### 3. Variables de entorno
 
@@ -77,18 +91,28 @@ valor por defecto. Lo que sí conviene fijar cuando se sepa es
 se hace una vez en local y lo que queda guardado en la base de datos es el
 refresh token, cifrado. Vercel solo necesita poder refrescarlo.
 
-### 4. Login, contra la base de datos remota
+### 4. Login, una sola vez
 
-Fácil de pasar por alto y rompe el cron entero: **el refresh token se guarda en
-Postgres**, cifrado, no en un fichero. Así que el login tiene que escribir en la
-misma base que va a leer Vercel:
+**Desde el navegador**, que es lo que no exige tener nada instalado:
+
+> `https://TU-APP.vercel.app/setup/login`
+
+Pide tres cosas: el `CRON_SECRET` (que es lo que protege la página), y el email
+y la contraseña de LaLiga Fantasy. **La contraseña no se guarda en ningún
+sitio** —ni en la base ni en las variables de entorno—: se usa para pedir el
+token y se descarta. Lo único que queda almacenado es el refresh token,
+cifrado.
+
+Con terminal, el equivalente es `npm run sync -- --login`. En ese caso hay que
+apuntar a la base **remota**, porque el token se guarda en Postgres y no en un
+fichero:
 
 ```bash
 DATABASE_URL="<la de Neon>" npm run sync -- --login
 ```
 
-Si se hace contra un Postgres local, Vercel no encontrará token y el cron
-fallará con *"No hay refresh token guardado"*.
+Hacerlo contra un Postgres local deja a Vercel sin token, y el cron falla con
+*"No hay refresh token guardado"*.
 
 Ojo: ROPC solo funciona con cuentas locales de email y contraseña. Si la cuenta
 del juego es de Google, Apple o Facebook, esto falla por diseño y hace falta el

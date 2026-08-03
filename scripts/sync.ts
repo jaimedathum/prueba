@@ -9,7 +9,11 @@
  *   npm run sync -- --login      inicia sesión y guarda el refresh token
  */
 import { closeDb } from "@/lib/db";
-import { FantasySession, loginWithPassword } from "@/lib/fantasy/auth";
+import {
+  FantasySession,
+  SOCIAL_ACCOUNT_HINT,
+  loginWithPassword,
+} from "@/lib/fantasy/auth";
 import { FantasyClient } from "@/lib/fantasy/client";
 import { endpoints } from "@/lib/fantasy/endpoints";
 import { runSync } from "@/lib/ingest/sync";
@@ -48,12 +52,7 @@ async function doLogin(): Promise<void> {
     // ROPC solo habla con cuentas locales de B2C, así que conviene decirlo
     // aquí en vez de dejar que parezca que la API se ha cerrado.
     throw new Error(
-      `${error instanceof Error ? error.message : String(error)}\n\n` +
-        "Si la contraseña es correcta, lo más probable es que tu cuenta del " +
-        "juego sea de Google, Apple o Facebook. El login por contraseña " +
-        "(ROPC) solo funciona con cuentas locales de email y contraseña; " +
-        "para las sociales hace falta el flujo interactivo, todavía sin " +
-        "implementar. Ver docs/reglas.md.",
+      `${error instanceof Error ? error.message : String(error)}\n\n${SOCIAL_ACCOUNT_HINT}`,
     );
   }
   console.log("Sesión iniciada. Refresh token guardado cifrado.");

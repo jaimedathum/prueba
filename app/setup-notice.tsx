@@ -15,13 +15,40 @@ export function SetupNotice({ message }: { message: string }) {
         {message}
       </pre>
 
+      <h2 className="text-sm font-semibold">Desde el navegador</h2>
+      <ol className="list-decimal space-y-2 pl-5 text-sm">
+        <li>
+          Comprueba que <code>DATABASE_URL</code>, <code>TOKEN_ENCRYPTION_KEY</code>{" "}
+          y <code>CRON_SECRET</code> están en las variables de entorno del
+          despliegue.
+        </li>
+        <li>
+          Las tablas se crean solas en cada despliegue. Si falta alguna, vuelve
+          a desplegar y mira el log del build.
+        </li>
+        <li>
+          Inicia sesión una vez en{" "}
+          <a className="underline" href="/setup/login">
+            /setup/login
+          </a>
+          .
+        </li>
+        <li>
+          Lanza la primera sincronización llamando a{" "}
+          <code>/api/cron/sync</code> con la cabecera{" "}
+          <code>Authorization: Bearer $CRON_SECRET</code>, o espera al cron
+          diario.
+        </li>
+      </ol>
+
+      <h2 className="text-sm font-semibold">Con terminal</h2>
       <ol className="list-decimal space-y-2 pl-5 text-sm">
         <li>
           Copia <code>.env.example</code> a <code>.env</code> y rellena{" "}
           <code>DATABASE_URL</code> y <code>TOKEN_ENCRYPTION_KEY</code>.
         </li>
         <li>
-          Crea las tablas: <code>npm run db:migrate</code>
+          Crea las tablas: <code>npm run db:deploy</code>
         </li>
         <li>
           Confirma que las rutas son de solo lectura:{" "}
