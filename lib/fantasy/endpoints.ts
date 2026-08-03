@@ -8,7 +8,18 @@
  * esté en esta lista. La garantía es estructural, no de disciplina.
  */
 
-export const API_BASE = "https://fantasy-api.llt-services.com";
+/**
+ * Base de la API del juego.
+ *
+ * Sin confirmar: hay un proyecto de terceros que apunta a
+ * `https://fantasy-api.llt-services.com/api` (con prefijo `/api`) mientras que
+ * aquí se usa la raíz. Es configurable justo por eso: si la sincronización
+ * devuelve 404 en TODAS las rutas —no en una suelta— es este prefijo, y se
+ * arregla con una variable de entorno en vez de tocar código.
+ */
+export const API_BASE = (
+  process.env.FANTASY_API_BASE || "https://fantasy-api.llt-services.com"
+).replace(/\/$/, "");
 
 /**
  * Identificador de competición. Se confirma en la fase 0 leyendo la respuesta

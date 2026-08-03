@@ -334,9 +334,12 @@ marcadas como tales en el código en vez de disimuladas:
   jornadaperfecta.com ni futbolfantasy.com. Están aislados en una constante
   `SELECTORS` por adaptador; confirmarlos es tocar un solo sitio. Los tests usan
   fixtures propias, así que validan la extracción, no el marcado remoto.
-- **Parámetros del login B2C**: `FANTASY_B2C_TOKEN_URL`, `_CLIENT_ID` y
-  `_SCOPE` se obtienen observando el login de la app oficial. Sin ellos la app
-  falla con un mensaje claro.
+- **Parámetros del login B2C**: tienen valor por defecto, tomado del código de
+  un proyecto de terceros que ataca el mismo juego, pero **sin verificar contra
+  la red desde aquí**. Es seguro: un parámetro mal falla ruidosamente en el
+  login, no en silencio. Detalle y procedencia en [`docs/reglas.md`](docs/reglas.md).
+- **El prefijo `/api` de la URL base**: sin confirmar. Si la sincronización da
+  404 en *todas* las rutas, se arregla con `FANTASY_API_BASE`.
 
 Una fuente que responde 200 pero devuelve cero jugadores se trata como **caída**,
 no como "hoy no juega nadie": confundir esas dos cosas envenenaría todas las
@@ -347,7 +350,7 @@ proyecciones.
 ## Desarrollo
 
 ```bash
-npm test          # 287 tests
+npm test          # 300 tests
 npm run typecheck
 npm run build
 ```

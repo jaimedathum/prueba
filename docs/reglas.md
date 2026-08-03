@@ -151,18 +151,63 @@ saliendo, solo que mal.
 
 ---
 
-## Configuración del login (también pendiente)
+## Configuración del login
 
-`lib/fantasy/auth.ts` necesita tres variables que se obtienen observando la
-petición de login de la app oficial:
+**Ya no está pendiente.** Los parámetros del tenant Azure B2C están puestos por
+defecto en `lib/fantasy/auth.ts` y el login se puede probar sin configurar nada:
 
-| Variable | Qué es |
+| Parámetro | Valor por defecto |
 |---|---|
-| `FANTASY_B2C_TOKEN_URL` | Endpoint de token del tenant Azure B2C de LaLiga |
-| `FANTASY_B2C_CLIENT_ID` | `client_id` que usa la app |
-| `FANTASY_B2C_SCOPE` | Scope solicitado |
+| Token URL | `https://login.laliga.es/laligadspprob2c.onmicrosoft.com/oauth2/v2.0/token` |
+| Política ROPC | `B2C_1A_ResourceOwnerv2` |
+| `client_id` | `af88bcff-1157-40a0-b579-030728aacf0b` |
+| Scope | `openid {client_id} offline_access` |
 
-Sin ellas la app falla con un mensaje explícito en vez de intentar adivinarlas.
+Cada uno se sobreescribe con su `FANTASY_B2C_*` correspondiente.
+
+**Procedencia y nivel de confianza**: salen de leer el código de
+[Externoak/LaLigaApp](https://github.com/Externoak/LaLigaApp), un proyecto
+activo que ataca este mismo juego y la misma API. **No se han verificado contra
+la red desde este repositorio.** Traerlos es seguro porque un parámetro mal
+falla ruidosamente en el login (400/401), nunca en silencio: no puede
+contaminar una recomendación, que es el criterio que aplica el resto del
+documento.
+
+### Dos cosas que conviene no volver a aprender
+
+**El bearer de la API es el `id_token`, no el `access_token`.** Con scope
+`openid`, B2C devuelve `id_token` y puede no devolver `access_token` en
+absoluto. El código exigía `access_token`, así que **un login correcto fallaba**
+con "Fallo de autenticación" — que se lee como "la API está cerrada" cuando lo
+único que pasaba es que mirábamos el campo equivocado. Hay tests que lo fijan en
+`lib/fantasy/auth.test.ts`.
+
+**ROPC solo funciona con cuentas locales de B2C**, las de email y contraseña. Si
+tu cuenta del juego es de Google, Apple o Facebook, `--login` va a fallar por
+diseño: el flujo de contraseña no puede hablar con un proveedor externo. La
+salida en ese caso es el flujo interactivo (authorization code + PKCE), que
+**todavía no está implementado**.
+
+### Lo que el cierre de la web NO significa
+
+El juego oficial es hoy **solo app móvil**. Eso mata una vía concreta de
+conseguir el token —abrir el juego en el navegador y sacarlo de `localStorage`—
+que **este proyecto nunca usó**: aquí siempre se ha hecho ROPC directo contra
+B2C. La API `fantasy-api.llt-services.com` sigue viva porque es la que consume
+la app móvil.
+
+Tampoco hace falta un MITM entre el móvil y un PC para la ingesta diaria. El
+MITM sigue siendo útil, pero como **herramienta de diagnóstico puntual** para
+cerrar los pendientes de arriba (sobre todo la `k` del blindaje y el punto 8),
+no como arquitectura permanente: obligaría a tener el móvil emparejado en cada
+sincronización y moriría en cuanto la app active certificate pinning.
+
+### Sin confirmar: el prefijo `/api`
+
+LaLigaApp apunta a `https://fantasy-api.llt-services.com/api` mientras que aquí
+se usa la raíz. Los nombres de ruta coinciden exactamente en todo lo demás. Si
+la sincronización da **404 en todas las rutas** —no en una suelta— es esto, y se
+arregla poniendo `FANTASY_API_BASE` con el sufijo.
 
 ---
 

@@ -10,7 +10,7 @@ function fakeSession(): FantasySession {
     write: async () => {},
   };
   const session = new FantasySession(store);
-  vi.spyOn(session, "getAccessToken").mockResolvedValue("token-de-prueba");
+  vi.spyOn(session, "getBearerToken").mockResolvedValue("token-de-prueba");
   return session;
 }
 

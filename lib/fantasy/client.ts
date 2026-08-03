@@ -127,7 +127,7 @@ export class FantasyClient {
       await this.throttle();
 
       try {
-        const token = await this.session.getAccessToken();
+        const token = await this.session.getBearerToken();
         const response = await this.fetchImpl(url, {
           method: "GET",
           headers: {
