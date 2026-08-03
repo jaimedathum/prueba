@@ -6,48 +6,78 @@ import { decryptToken, encryptToken } from "./crypto";
 /**
  * Autenticación contra el tenant Azure B2C de LaLiga.
  *
- * Los cuatro parámetros del tenant (host, política, client_id y scope) no se
- * hardcodean porque no se han verificado todavía: se obtienen en la fase 0
- * observando la petición de login de la app oficial y se documentan en
- * docs/reglas.md. Hasta entonces la app falla con un mensaje claro en vez de
- * intentar adivinarlos.
+ * Dos cosas que costaron caras y conviene no volver a aprender:
+ *
+ * 1. **El bearer de la API es el `id_token`, no el `access_token`.** Con scope
+ *    `openid` B2C devuelve `id_token` y puede no devolver `access_token`
+ *    siquiera. Exigir `access_token` hacía que un login CORRECTO fallara con
+ *    "Fallo de autenticación", que se lee como "la API está cerrada" cuando en
+ *    realidad estábamos mirando el campo equivocado.
+ * 2. **ROPC sigue vivo** en la política `B2C_1A_ResourceOwnerv2`. No hace falta
+ *    ni versión web del juego (ya no existe: es solo app móvil) ni un MITM
+ *    contra el móvil. La API del juego no depende de la web.
+ *
+ * Los valores por defecto están tomados de un proyecto de terceros que ataca
+ * este mismo juego y NO se han verificado contra la red desde aquí. Es
+ * seguro traerlos porque un parámetro mal falla ruidosamente (400/401 en el
+ * login), nunca en silencio: no puede contaminar una recomendación. Cualquiera
+ * se sobreescribe por entorno. Ver docs/reglas.md.
  *
  * Este módulo es el ÚNICO sitio del proyecto que hace un POST, y va contra el
  * endpoint de token, nunca contra la API del juego. La allowlist de lectura de
  * `client.ts` sigue siendo absoluta.
  */
 
+/** Sin verificar contra la red. Sobreescribibles con FANTASY_B2C_*. */
+const DEFAULT_TOKEN_URL =
+  "https://login.laliga.es/laligadspprob2c.onmicrosoft.com/oauth2/v2.0/token";
+const DEFAULT_CLIENT_ID = "af88bcff-1157-40a0-b579-030728aacf0b";
+const DEFAULT_ROPC_POLICY = "B2C_1A_ResourceOwnerv2";
+
 export interface B2CConfig {
   tokenUrl: string;
   clientId: string;
   scope: string;
+  /** Política (user flow) de B2C; viaja como `?p=` en la URL de token. */
+  policy: string;
 }
 
 export function getB2CConfig(): B2CConfig {
-  const tokenUrl = process.env.FANTASY_B2C_TOKEN_URL;
-  const clientId = process.env.FANTASY_B2C_CLIENT_ID;
-  const scope = process.env.FANTASY_B2C_SCOPE;
+  const clientId = process.env.FANTASY_B2C_CLIENT_ID || DEFAULT_CLIENT_ID;
+  return {
+    tokenUrl: process.env.FANTASY_B2C_TOKEN_URL || DEFAULT_TOKEN_URL,
+    clientId,
+    // B2C exige el propio client_id como scope para emitir un token utilizable
+    // contra la API; `offline_access` es lo que hace que llegue refresh token.
+    scope:
+      process.env.FANTASY_B2C_SCOPE ||
+      `openid ${clientId} offline_access`,
+    policy: process.env.FANTASY_B2C_POLICY || DEFAULT_ROPC_POLICY,
+  };
+}
 
-  if (!tokenUrl || !clientId || !scope) {
-    throw new Error(
-      "Faltan FANTASY_B2C_TOKEN_URL, FANTASY_B2C_CLIENT_ID o FANTASY_B2C_SCOPE. " +
-        "Se obtienen en la fase 0 observando el login de la app oficial; " +
-        "ver docs/reglas.md.",
-    );
+/** Añade `?p=<policy>` salvo que la URL ya traiga la política puesta. */
+export function tokenUrlWithPolicy(tokenUrl: string, policy: string): string {
+  const url = new URL(tokenUrl);
+  if (!url.searchParams.has("p") && policy) {
+    url.searchParams.set("p", policy);
   }
-  return { tokenUrl, clientId, scope };
+  return url.toString();
 }
 
 export interface TokenResponse {
-  accessToken: string;
+  /** El que va en `Authorization: Bearer`. Normalmente el `id_token`. */
+  bearerToken: string;
   refreshToken: string;
   expiresAt: number;
 }
 
 interface RawTokenResponse {
   access_token?: string;
+  id_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  id_token_expires_in?: number;
   error?: string;
   error_description?: string;
 }
@@ -55,8 +85,8 @@ interface RawTokenResponse {
 async function requestToken(
   body: Record<string, string>,
 ): Promise<TokenResponse> {
-  const { tokenUrl } = getB2CConfig();
-  const response = await fetch(tokenUrl, {
+  const { tokenUrl, policy } = getB2CConfig();
+  const response = await fetch(tokenUrlWithPolicy(tokenUrl, policy), {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(body).toString(),
@@ -64,22 +94,35 @@ async function requestToken(
 
   const json = (await response.json().catch(() => ({}))) as RawTokenResponse;
 
-  if (!response.ok || !json.access_token || !json.refresh_token) {
+  // El id_token manda: es el que la API acepta como bearer. El access_token
+  // queda como reserva por si el tenant cambia de criterio.
+  const bearerToken = json.id_token ?? json.access_token;
+
+  if (!response.ok || !bearerToken || !json.refresh_token) {
     const detail = json.error_description ?? json.error ?? response.statusText;
     throw new Error(`Fallo de autenticación (${response.status}): ${detail}`);
   }
 
+  const lifetime = json.id_token_expires_in ?? json.expires_in ?? 3600;
+
   return {
-    accessToken: json.access_token,
+    bearerToken,
     refreshToken: json.refresh_token,
     // Margen de 60s para no usar un token que caduca a mitad de la petición.
-    expiresAt: Date.now() + ((json.expires_in ?? 3600) - 60) * 1000,
+    expiresAt: Date.now() + (lifetime - 60) * 1000,
   };
 }
 
 /**
  * Login inicial con usuario y contraseña (flujo ROPC de B2C). Se ejecuta una
  * sola vez, en local: después basta el refresh token guardado.
+ *
+ * Aviso importante: **ROPC solo funciona con cuentas locales de B2C**, es
+ * decir, las de email y contraseña. Si tu cuenta del juego es de Google, Apple
+ * o Facebook, esto va a fallar y no es un bug: el flujo de contraseña no puede
+ * hablar con un proveedor de identidad externo. En ese caso hace falta el
+ * flujo interactivo (authorization code + PKCE), que todavía no está
+ * implementado aquí.
  */
 export async function loginWithPassword(
   email: string,
@@ -92,7 +135,8 @@ export async function loginWithPassword(
     scope,
     username: email,
     password,
-    response_type: "token id_token",
+    // `id_token` a secas: es el token que la API acepta como bearer.
+    response_type: "id_token",
   });
 }
 
@@ -164,15 +208,20 @@ export const dbTokenStore: TokenStore = {
  * rotando el refresh token guardado.
  */
 export class FantasySession {
-  private accessToken: string | null = null;
+  private bearerToken: string | null = null;
   private expiresAt = 0;
   private inFlight: Promise<string> | null = null;
 
   constructor(private readonly store: TokenStore = dbTokenStore) {}
 
-  async getAccessToken(): Promise<string> {
-    if (this.accessToken && Date.now() < this.expiresAt) {
-      return this.accessToken;
+  /**
+   * Token para `Authorization: Bearer`. Se llama así, y no `getAccessToken`,
+   * porque lo que devuelve es el `id_token`: confundir ambos fue justo el bug
+   * que hacía parecer que la API estaba cerrada.
+   */
+  async getBearerToken(): Promise<string> {
+    if (this.bearerToken && Date.now() < this.expiresAt) {
+      return this.bearerToken;
     }
     // Varias peticiones concurrentes comparten un único refresco.
     this.inFlight ??= this.refresh().finally(() => {
@@ -190,15 +239,15 @@ export class FantasySession {
     }
     const tokens = await refreshAccessToken(stored);
     await this.store.write(tokens.refreshToken);
-    this.accessToken = tokens.accessToken;
+    this.bearerToken = tokens.bearerToken;
     this.expiresAt = tokens.expiresAt;
-    return tokens.accessToken;
+    return tokens.bearerToken;
   }
 
   /** Guarda la sesión tras un login con contraseña. */
   async adopt(tokens: TokenResponse): Promise<void> {
     await this.store.write(tokens.refreshToken);
-    this.accessToken = tokens.accessToken;
+    this.bearerToken = tokens.bearerToken;
     this.expiresAt = tokens.expiresAt;
   }
 }

@@ -40,8 +40,22 @@ async function doLogin(): Promise<void> {
         "Puedes borrarlas después: solo se guarda el refresh token, cifrado.",
     );
   }
-  const tokens = await loginWithPassword(email, password);
-  await new FantasySession().adopt(tokens);
+  try {
+    const tokens = await loginWithPassword(email, password);
+    await new FantasySession().adopt(tokens);
+  } catch (error) {
+    // El fallo más probable no es la contraseña: es que la cuenta sea social.
+    // ROPC solo habla con cuentas locales de B2C, así que conviene decirlo
+    // aquí en vez de dejar que parezca que la API se ha cerrado.
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}\n\n` +
+        "Si la contraseña es correcta, lo más probable es que tu cuenta del " +
+        "juego sea de Google, Apple o Facebook. El login por contraseña " +
+        "(ROPC) solo funciona con cuentas locales de email y contraseña; " +
+        "para las sociales hace falta el flujo interactivo, todavía sin " +
+        "implementar. Ver docs/reglas.md.",
+    );
+  }
   console.log("Sesión iniciada. Refresh token guardado cifrado.");
   console.log("Ya puedes borrar FANTASY_PASSWORD del .env.");
 }
