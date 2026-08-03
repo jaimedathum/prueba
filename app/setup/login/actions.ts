@@ -48,6 +48,22 @@ export interface LoginState {
   authorizeUrl?: string;
 }
 
+/**
+ * Mensaje de éxito, compartido por los dos flujos.
+ *
+ * Dice explícitamente que falta un paso porque la versión anterior —"a partir
+ * de ahora el despliegue se mantiene solo"— se leía como "ya está", y dejaba
+ * al usuario mirando una app vacía sin saber que nadie había traído los datos
+ * todavía. Iniciar sesión y sincronizar son cosas distintas.
+ */
+const LOGGED_IN_MESSAGE =
+  "Sesión iniciada. El refresh token está guardado cifrado en la base de " +
+  "datos, junto con la política que lo emitió, y tus credenciales no se han " +
+  "almacenado en ninguna parte.\n\n" +
+  "FALTA UN PASO: la base de datos sigue vacía. Ve a /setup y pulsa " +
+  "«Sincronizar» para traer los primeros datos. Hasta entonces la app se verá " +
+  "en blanco. Después ya se mantiene sola con el cron diario.";
+
 const VERIFIER_COOKIE = "fa_pkce";
 /** El usuario tiene que ir a LaLiga y volver; 15 minutos sobran. */
 const VERIFIER_TTL_SECONDS = 15 * 60;
@@ -92,12 +108,7 @@ export async function loginAction(
     return { ok: false, message: `${detail}\n\n${SOCIAL_ACCOUNT_HINT}` };
   }
 
-  return {
-    ok: true,
-    message:
-      "Sesión iniciada. El refresh token ya está guardado cifrado en la base " +
-      "de datos. Tu contraseña no se ha almacenado en ningún sitio.",
-  };
+  return { ok: true, message: LOGGED_IN_MESSAGE };
 }
 
 /* ---------------------------- interactivo --------------------------- */
@@ -203,11 +214,5 @@ export async function completeInteractiveLogin(
   // El verifier ya no vale para nada: fuera.
   jar.delete(VERIFIER_COOKIE);
 
-  return {
-    ok: true,
-    message:
-      "Sesión iniciada. El refresh token está guardado cifrado en la base de " +
-      "datos, junto con la política que lo emitió para poder refrescarlo. A " +
-      "partir de ahora el despliegue se mantiene solo.",
-  };
+  return { ok: true, message: LOGGED_IN_MESSAGE };
 }
