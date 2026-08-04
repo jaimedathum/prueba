@@ -316,7 +316,11 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       extractMyTeamId(mePayload, leagueId) ??
       // `/v4/user/me` no trae equipos, así que la vía que de verdad funciona
       // es cruzar el nombre de manager con la clasificación.
-      matchMyTeamByName(extractManagerName(mePayload), parsedManagers);
+      matchMyTeamByName(extractManagerName(mePayload), parsedManagers) ??
+      // `/leagues` solo devuelve TUS ligas, así que en una con un único equipo
+      // ese equipo es necesariamente el tuyo. No es una heurística: es una
+      // deducción, y desatasca las ligas recién creadas para probar.
+      (parsedManagers.length === 1 ? parsedManagers[0]!.id : null);
 
     if (db && myTeamId && parsedManagers.some((m) => m.id === myTeamId)) {
       await db
