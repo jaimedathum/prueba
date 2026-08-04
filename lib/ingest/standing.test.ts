@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseManager, parseMatch } from "./parse";
+import { parseManager, parseMatch, parseTeamBalance } from "./parse";
 
 /**
  * Formas reales de la API, capturadas del informe de mapeo del 2026-08-04.
@@ -104,5 +104,27 @@ describe("parseMatch", () => {
     );
 
     expect(match?.homeTeamId).toBe("T1");
+  });
+});
+
+describe("parseTeamBalance", () => {
+  it("saca el saldo del detalle del equipo", () => {
+    expect(parseTeamBalance({ teamMoney: 100_000_000 })).toBe(100_000_000);
+  });
+
+  it("acepta los alias plausibles", () => {
+    expect(parseTeamBalance({ money: 5 })).toBe(5);
+    expect(parseTeamBalance({ team: { teamMoney: 7 } })).toBe(7);
+  });
+
+  it("devuelve null para un rival, cuyo saldo no es visible", () => {
+    // Correcto y esperado: justo por eso existe el motor que lo estima.
+    expect(parseTeamBalance({ players: [] })).toBeNull();
+    expect(parseTeamBalance(null)).toBeNull();
+  });
+
+  it("no confunde un saldo de cero con un saldo ausente", () => {
+    // Arruinado y sin datos no son lo mismo: uno acota la caja, el otro no.
+    expect(parseTeamBalance({ teamMoney: 0 })).toBe(0);
   });
 });
