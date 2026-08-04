@@ -177,6 +177,30 @@ export function parseManager(
   };
 }
 
+/**
+ * Saldo de un equipo, sacado del detalle del equipo.
+ *
+ * La clasificación **no lo trae** —confirmado en la práctica— y por eso la
+ * calibración se quedaba sin nada contra lo que corregir: la caja propia salía
+ * igual al presupuesto inicial supuesto (200M) en vez de al real, y ese sesgo
+ * se propagaba a las bandas de todos los rivales.
+ *
+ * Para los rivales normalmente será null, que es correcto: su saldo no es
+ * visible y justo por eso hay un motor que lo estima.
+ */
+export function parseTeamBalance(payload: unknown): number | null {
+  const source: Json = isJsonObject(payload) ? payload : {};
+  const m = new FieldMapper(source, "teamBalance");
+  return m.number(
+    "teamMoney",
+    "money",
+    "balance",
+    "team.teamMoney",
+    "team.money",
+    "teamBalance",
+  );
+}
+
 export interface ParsedRosterEntry {
   playerId: string;
   buyoutClause: number | null;

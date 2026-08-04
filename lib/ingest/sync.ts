@@ -14,6 +14,7 @@ import {
   rosterSnapshots,
   syncRuns,
 } from "@/lib/db/schema";
+import { initialBudget } from "@/lib/engine/rules";
 import { FantasyClient } from "@/lib/fantasy/client";
 import { endpoints } from "@/lib/fantasy/endpoints";
 import { ShapeCollector } from "./mapper";
@@ -25,6 +26,7 @@ import {
   parsePlayer,
   parsePlayerMatchStat,
   parseRealTeam,
+  parseTeamBalance,
   parseRosterEntry,
   type ParsedRealTeam,
 } from "./parse";
@@ -357,10 +359,22 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       acquisitionPrice: number | null;
     }> = [];
 
+    const balances = new Map<string, number>();
+
     for (const manager of parsedManagers) {
       const teamPayload = await client.get(
         endpoints.team(leagueId, manager.id),
       );
+
+      // El saldo vive aquí, no en la clasificación. Sin él la calibración no
+      // tiene contra qué corregir y la caja propia se queda en el presupuesto
+      // inicial supuesto.
+      const balance = parseTeamBalance(teamPayload);
+      if (balance !== null) {
+        balances.set(manager.id, balance);
+        manager.reportedBalance = balance;
+      }
+
       const roster =
         asArray((teamPayload as Record<string, unknown>)?.["players"]).length > 0
           ? asArray((teamPayload as Record<string, unknown>)["players"])
@@ -382,7 +396,27 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       }
     }
     stats.rosterEntries = rosterRows.length;
+    stats.balancesKnown = balances.size;
     log(`Jugadores en plantillas: ${rosterRows.length}`);
+
+    if (db && balances.size > 0) {
+      for (const [managerId, balance] of balances) {
+        await db
+          .update(managers)
+          .set({ reportedBalance: balance, updatedAt: new Date() })
+          .where(eq(managers.id, managerId));
+      }
+    }
+
+    if (myTeamId && !balances.has(myTeamId)) {
+      warnings.push(
+        "No se ha encontrado tu saldo, así que la caja no se puede calibrar " +
+          "y todas las bandas arrastran el presupuesto inicial supuesto " +
+          `(${(initialBudget() / 1_000_000).toFixed(0)}M). Si tu liga empieza ` +
+          "con otro, configúralo en FANTASY_INITIAL_BUDGET, y revisa los " +
+          "alias de parseTeamBalance con --shape.",
+      );
+    }
 
     if (db && rosterRows.length > 0) {
       // Solo se guardan las entradas de jugadores que ya existen en la tabla
