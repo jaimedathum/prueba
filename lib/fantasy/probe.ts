@@ -74,13 +74,21 @@ async function probe(
   }
 }
 
-function conclude(results: ProbeResult[], workingBase: string | null): string {
+function conclude(
+  results: ProbeResult[],
+  workingBase: string | null,
+  /** La base que está configurada ahora mismo, no la constante del módulo:
+   *  son distintas cuando se diagnostica una base concreta. */
+  configuredBase: string,
+): string {
   if (workingBase) {
+    const yaConfigurada = workingBase === configuredBase;
     const leagues = results.find((r) => r.path.includes("/leagues"));
+
     if (leagues?.status === 200) {
       return (
         `Todo correcto con la base ${workingBase}. ` +
-        (workingBase === API_BASE
+        (yaConfigurada
           ? "Es la que ya está configurada."
           : `Ponla en FANTASY_API_BASE y vuelve a desplegar.`)
       );
@@ -90,9 +98,7 @@ function conclude(results: ProbeResult[], workingBase: string | null): string {
       `/v1/competition/${COMPETITION_ID}/leagues responde ` +
       `${leagues?.status ?? "nada"}. El problema es el identificador de ` +
       `competición: prueba otro valor en FANTASY_COMPETITION_ID. ` +
-      (workingBase === API_BASE
-        ? ""
-        : `Y de paso pon FANTASY_API_BASE=${workingBase}.`)
+      (yaConfigurada ? "" : `Y de paso pon FANTASY_API_BASE=${workingBase}.`)
     );
   }
 
@@ -120,6 +126,7 @@ export async function diagnoseApi(options: {
 } = {}): Promise<ApiDiagnosis> {
   const session = options.session ?? new FantasySession();
   const fetchImpl = options.fetchImpl ?? fetch;
+  const configuredBase = (options.base ?? API_BASE).replace(/\/$/, "");
   const token = await session.getBearerToken();
 
   const results: ProbeResult[] = [];
@@ -127,7 +134,7 @@ export async function diagnoseApi(options: {
   let me: unknown = null;
 
   // En serie, como todo lo que habla con esta API.
-  for (const base of candidateBases(options.base)) {
+  for (const base of candidateBases(configuredBase)) {
     const result = await probe(base, endpoints.me(), token, fetchImpl);
     results.push(result);
     if (result.status === 200 && workingBase === null) {
@@ -143,5 +150,10 @@ export async function diagnoseApi(options: {
     );
   }
 
-  return { results, workingBase, me, conclusion: conclude(results, workingBase) };
+  return {
+    results,
+    workingBase,
+    me,
+    conclusion: conclude(results, workingBase, configuredBase),
+  };
 }

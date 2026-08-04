@@ -60,14 +60,28 @@ describe("candidateBases", () => {
 
 describe("diagnoseApi", () => {
   it("identifica que falta el prefijo /api", async () => {
-    const base = `${API_BASE}/api`;
+    // Escenario del 2026-08-03: configurada la raíz, pero solo responde /api.
+    const raiz = "https://fantasy-api.llt-services.com";
+    const conPrefijo = `${raiz}/api`;
+
     const diagnosis = await diagnoseApi({
       session: fakeSession(),
-      fetchImpl: fetchOnly(base),
+      base: raiz,
+      fetchImpl: fetchOnly(conPrefijo),
     });
 
-    expect(diagnosis.workingBase).toBe(base);
+    expect(diagnosis.workingBase).toBe(conPrefijo);
     expect(diagnosis.conclusion).toContain("FANTASY_API_BASE");
+  });
+
+  it("no pide cambiar nada cuando la base configurada ya es la buena", async () => {
+    const diagnosis = await diagnoseApi({
+      session: fakeSession(),
+      fetchImpl: fetchOnly(API_BASE),
+    });
+
+    expect(diagnosis.workingBase).toBe(API_BASE);
+    expect(diagnosis.conclusion).toContain("ya está configurada");
   });
 
   it("señala el identificador de competición cuando la base sí funciona", async () => {

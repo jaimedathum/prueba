@@ -66,6 +66,46 @@ function chunk<T>(items: T[], size = 500): T[][] {
 }
 
 /**
+ * Nombre de manager en la respuesta de `/v4/user/me`.
+ *
+ * Confirmado contra la API real: `/v4/user/me` devuelve el usuario pelado
+ * —`id`, `managerName`, `locale`, `region`— y **ningún equipo ni liga**. Así
+ * que el id que trae es el del usuario, no el del equipo, y no sirve para
+ * identificar la plantilla. El nombre sí, cruzándolo con la clasificación.
+ */
+export function extractManagerName(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const root = payload as Record<string, unknown>;
+
+  for (const key of ["managerName", "name", "nickname", "userName"]) {
+    const value = root[key];
+    if (typeof value === "string" && value.trim() !== "") return value.trim();
+  }
+  return null;
+}
+
+/**
+ * Cruza el nombre de `/v4/user/me` con los managers de la clasificación.
+ *
+ * Solo resuelve si la coincidencia es **única**: con dos managers llamados
+ * igual, elegir uno sería jugársela a cara o cruz, y equivocarse aquí es
+ * silencioso —la app enseñaría la plantilla de otro como si fuera tuya—, que
+ * es justo el error que este proyecto no se permite.
+ */
+export function matchMyTeamByName(
+  managerName: string | null,
+  managers: Array<{ id: string; managerName: string | null }>,
+): string | null {
+  if (!managerName) return null;
+  const target = managerName.trim().toLowerCase();
+
+  const matches = managers.filter(
+    (manager) => manager.managerName?.trim().toLowerCase() === target,
+  );
+  return matches.length === 1 ? matches[0]!.id : null;
+}
+
+/**
  * Busca el id de mi equipo en la respuesta de `/v4/user/me`. La forma exacta
  * está sin confirmar, así que se prueban varias rutas plausibles y, si ninguna
  * encaja, se devuelve null y la sincronización avisa en vez de adivinar.
@@ -242,7 +282,11 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     // no tiene contra qué calibrarse (el saldo propio es el único visible).
     const mePayload = await client.get(endpoints.me());
     const myTeamId =
-      process.env.FANTASY_TEAM_ID ?? extractMyTeamId(mePayload, leagueId);
+      process.env.FANTASY_TEAM_ID ??
+      extractMyTeamId(mePayload, leagueId) ??
+      // `/v4/user/me` no trae equipos, así que la vía que de verdad funciona
+      // es cruzar el nombre de manager con la clasificación.
+      matchMyTeamByName(extractManagerName(mePayload), parsedManagers);
 
     if (db && myTeamId && parsedManagers.some((m) => m.id === myTeamId)) {
       await db
@@ -256,9 +300,15 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       stats.myTeamIdentified = 1;
     } else {
       stats.myTeamIdentified = 0;
+      const nombre = extractManagerName(mePayload);
       warnings.push(
-        "No se ha identificado tu equipo dentro de la liga. Configura FANTASY_TEAM_ID " +
-          "con el id de tu equipo (sale en el resumen de managers).",
+        "No se ha identificado tu equipo dentro de la liga, así que no se " +
+          "puede enseñar tu plantilla ni calibrar el motor de caja contra tu " +
+          "saldo. Configura FANTASY_TEAM_ID con el id de tu equipo." +
+          (nombre
+            ? ` Se ha buscado por tu nombre de manager ("${nombre}") sin ` +
+              "encontrar una coincidencia única en la clasificación."
+            : ""),
       );
     }
 
