@@ -15,12 +15,23 @@ import { usePathname } from "next/navigation";
  * inferior fija solo estorbaría.
  */
 
+/**
+ * Cinco destinos en la barra inferior: es lo que cabe cómodo en 375px sin
+ * que las etiquetas se corten. Los que no entran no desaparecen, van en la
+ * de escritorio y enlazados desde donde hacen falta.
+ */
 const LINKS = [
   { href: "/", label: "Plantilla", icon: SquadIcon },
   { href: "/alineacion", label: "Once", icon: PitchIcon },
   { href: "/mercado", label: "Mercado", icon: MarketIcon },
+  { href: "/rivales", label: "Rivales", icon: RivalsIcon },
   { href: "/riesgo", label: "Riesgo", icon: RiskIcon },
-  { href: "/overrides", label: "Ajustes", icon: SettingsIcon },
+] as const;
+
+/** En escritorio sobra sitio, así que caben también los secundarios. */
+const EXTRA = [
+  { href: "/overrides", label: "Correcciones" },
+  { href: "/setup", label: "Puesta en marcha" },
 ] as const;
 
 export function DesktopNav() {
@@ -28,7 +39,7 @@ export function DesktopNav() {
 
   return (
     <nav className="hidden items-center gap-1 sm:flex">
-      {LINKS.map(({ href, label }) => {
+      {[...LINKS, ...EXTRA].map(({ href, label }) => {
         const active = isActive(pathname, href);
         return (
           <Link
@@ -142,12 +153,13 @@ function RiskIcon() {
   );
 }
 
-function SettingsIcon() {
+function RivalsIcon() {
   return (
     <svg {...svg}>
-      <path d="M4 7h16M4 12h16M4 17h16" />
-      <circle cx="9" cy="7" r="2" />
-      <circle cx="15" cy="17" r="2" />
+      <circle cx="8" cy="9" r="3" />
+      <circle cx="17" cy="9" r="3" />
+      <path d="M2 20a6 6 0 0 1 12 0" />
+      <path d="M13 20a6 6 0 0 1 9-5" />
     </svg>
   );
 }
