@@ -24,7 +24,9 @@ import {
   parseMatch,
   parsePlayer,
   parsePlayerMatchStat,
+  parseRealTeam,
   parseRosterEntry,
+  type ParsedRealTeam,
 } from "./parse";
 import { RawRecorder } from "./raw";
 
@@ -198,7 +200,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     /* --- 2. Jugadores ---------------------------------------------- */
     const playersPayload = await client.get(endpoints.players());
     const parsedPlayers = [];
-    const teamsSeen = new Map<string, { id: string; name: string }>();
+    const teamsSeen = new Map<string, ParsedRealTeam>();
 
     for (const raw of asArray(playersPayload)) {
       const { player, mapper } = parsePlayer(raw);
@@ -206,13 +208,10 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       if (!player) continue;
       parsedPlayers.push(player);
 
-      const teamNode = (raw as Record<string, unknown>)?.["team"];
-      if (teamNode && typeof teamNode === "object") {
-        const t = teamNode as Record<string, unknown>;
-        if (typeof t.id === "string" && typeof t.name === "string") {
-          teamsSeen.set(t.id, { id: t.id, name: t.name });
-        }
-      }
+      // Mismo parser, mismos alias: así el equipo al que apunta el jugador es
+      // exactamente el que se guarda.
+      const team = parseRealTeam(raw);
+      if (team) teamsSeen.set(team.id, team);
     }
     stats.players = parsedPlayers.length;
     log(`Jugadores: ${parsedPlayers.length}`);
@@ -224,9 +223,40 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
           .values(batch)
           .onConflictDoUpdate({
             target: realTeams.id,
-            set: { name: sql`excluded.name` },
+            set: {
+              name: sql`excluded.name`,
+              shortName: sql`excluded.short_name`,
+              badgeUrl: sql`excluded.badge_url`,
+            },
           });
       }
+
+      // Un jugador no puede apuntar a un equipo que no existe: la clave ajena
+      // aborta el INSERT entero y con él la sincronización. Igual que en el
+      // feed de actividad, un id desconocido vacía el vínculo pero no tumba la
+      // ingesta. Se comprueba contra la tabla, no contra lo visto en esta
+      // pasada, porque puede haber equipos de sincronizaciones anteriores.
+      const knownTeamIds = new Set(
+        (await db.select({ id: realTeams.id }).from(realTeams)).map((t) => t.id),
+      );
+
+      let orphaned = 0;
+      for (const player of parsedPlayers) {
+        if (player.realTeamId !== null && !knownTeamIds.has(player.realTeamId)) {
+          player.realTeamId = null;
+          orphaned++;
+        }
+      }
+      if (orphaned > 0) {
+        stats.playersWithoutTeam = orphaned;
+        warnings.push(
+          `${orphaned} jugadores apuntan a un equipo que no se ha podido ` +
+            "identificar; se guardan sin equipo. El modelo de equipos y el " +
+            "ajuste por rival serán menos precisos para ellos. Revisa los " +
+            "alias de TEAM_ID_ALIASES en lib/ingest/parse.ts con --shape.",
+        );
+      }
+
       for (const batch of chunk(parsedPlayers)) {
         await db
           .insert(players)
