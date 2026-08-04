@@ -38,6 +38,9 @@ import type { RivalProfile } from "./exposure";
 
 const HORIZON_DAYS = 14;
 
+/** A 1 jornada es estimación; a 5 orientación; a 10 tendencia. */
+const PROJECTION_HORIZONS = [1, 5, 10];
+
 const FORMATIONS: Formation[] = FALLBACK_FORMATIONS.map((slots) => ({
   name: `${slots.DF}-${slots.MC}-${slots.DL}`,
   slots: slots as Record<PositionCode, number>,
@@ -73,8 +76,30 @@ export interface RivalView {
   alerts: string[];
 }
 
+/**
+ * Una fila de la clasificación proyectada.
+ *
+ * La proyección es deliberadamente simple —puntos actuales más el mejor once
+ * repetido N jornadas— porque cualquier cosa más elaborada fingiría saber
+ * cosas que no se saben: nadie sabe a quién fichará cada uno, ni quién se
+ * lesionará. A una jornada es una estimación razonable; a diez es una
+ * tendencia, y así se dice.
+ */
+export interface StandingRow {
+  managerId: string;
+  teamName: string;
+  isMe: boolean;
+  currentPoints: number | null;
+  /** Puntos del mejor once que puede poner en la próxima jornada. */
+  perMatchday: number;
+  /** Proyección acumulada a 1, 5 y 10 jornadas. */
+  projections: { matchdays: number; points: number }[];
+}
+
 export interface RivalsDashboard {
   rivals: RivalView[];
+  standings: StandingRow[];
+  nextMatchday: number | null;
   warnings: string[];
 }
 
@@ -224,6 +249,46 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
 
   /* --- Una vista por rival ------------------------------------------ */
 
+  /** El mejor once de cualquiera, incluido el propio: la clasificación los
+   *  necesita a todos con la misma vara de medir. */
+  const bestElevenOf = (managerId: string) => {
+    const suyos = rows.filter((row) => row.managerId === managerId);
+    const candidates: LineupCandidate[] = suyos.map((seed) => {
+      const projection = context.project(seed);
+      return {
+        playerId: seed.playerId,
+        name: seed.name,
+        positionId: seed.positionId,
+        expectedPoints: projection.expectedPoints,
+        riskOfZero: projection.riskOfZero,
+        matchPoints: context.matchPointsOf(seed.playerId),
+      };
+    });
+    return optimizeLineup(candidates, FORMATIONS);
+  };
+
+  const standings: StandingRow[] = allManagers
+    .map((manager) => {
+      const perMatchday = bestElevenOf(manager.id)?.expectedPoints ?? 0;
+      const base = manager.points ?? 0;
+      return {
+        managerId: manager.id,
+        teamName: manager.teamName,
+        isMe: manager.id === me.id,
+        currentPoints: manager.points,
+        perMatchday,
+        projections: PROJECTION_HORIZONS.map((matchdays) => ({
+          matchdays,
+          points: base + perMatchday * matchdays,
+        })),
+      };
+    })
+    // Por la proyección más larga: es la que ordena de verdad la temporada.
+    .sort(
+      (a, b) =>
+        (b.projections.at(-1)?.points ?? 0) - (a.projections.at(-1)?.points ?? 0),
+    );
+
   const rivals: RivalView[] = allManagers
     .filter((m) => m.id !== me.id)
     .map((manager) => {
@@ -317,7 +382,14 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
     // El más peligroso primero: quien más caja tiene, más puede quitarte.
     .sort((a, b) => b.cash.max - a.cash.max);
 
-  return { rivals, warnings };
+  if (context.nextMatchday === null) {
+    warnings.push(
+      "No hay una jornada siguiente identificada, así que la proyección " +
+        "supone un calendario genérico y no el rival concreto de cada equipo.",
+    );
+  }
+
+  return { rivals, standings, nextMatchday: context.nextMatchday, warnings };
 }
 
 /**

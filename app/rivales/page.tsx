@@ -40,7 +40,7 @@ export default async function RivalesPage() {
     );
   }
 
-  const { rivals, warnings } = data;
+  const { rivals, standings, nextMatchday, warnings } = data;
 
   return (
     <Page
@@ -56,6 +56,82 @@ export default async function RivalesPage() {
           </ul>
         </Notice>
       )}
+
+      <Section
+        title={
+          nextMatchday
+            ? `Proyección desde la jornada ${nextMatchday}`
+            : "Proyección de la liga"
+        }
+        hint="Puntos actuales más el mejor once repetido. A una jornada es una estimación; a diez, una tendencia."
+      >
+        <div className="table-scroll">
+          <table className="w-full text-sm">
+            <thead>
+              <tr
+                className="border-b text-left text-xs uppercase"
+                style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+              >
+                <th className="py-2 pr-3">Equipo</th>
+                <th className="py-2 pr-3 text-right">Hoy</th>
+                <th className="py-2 pr-3 text-right">/jor</th>
+                {standings[0]?.projections.map((p) => (
+                  <th key={p.matchdays} className="py-2 pr-3 text-right">
+                    +{p.matchdays}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {standings.map((row, index) => (
+                <tr
+                  key={row.managerId}
+                  className="border-b"
+                  style={{
+                    borderColor: "var(--border)",
+                    background: row.isMe ? "var(--surface-2)" : undefined,
+                  }}
+                >
+                  <td className="py-2 pr-3">
+                    <span style={{ color: "var(--muted)" }}>{index + 1}.</span>{" "}
+                    <span className={row.isMe ? "font-semibold" : ""}>
+                      {row.teamName}
+                    </span>
+                  </td>
+                  <td className="nums py-2 pr-3 text-right">
+                    {row.currentPoints ?? "—"}
+                  </td>
+                  <td
+                    className="nums py-2 pr-3 text-right"
+                    style={{ color: "var(--muted)" }}
+                  >
+                    {row.perMatchday.toFixed(1)}
+                  </td>
+                  {row.projections.map((p) => (
+                    <td
+                      key={p.matchdays}
+                      className="nums py-2 pr-3 text-right"
+                      style={{
+                        color: row.isMe ? "var(--accent)" : undefined,
+                        fontWeight: row.isMe ? 600 : undefined,
+                      }}
+                    >
+                      {p.points.toFixed(0)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-xs" style={{ color: "var(--muted)" }}>
+          <strong>/jor</strong> son los puntos del mejor once que cada uno
+          puede poner. La proyección supone que la plantilla no cambia y que
+          todos alinean bien: nadie sabe quién fichará ni quién se lesionará,
+          así que a diez jornadas esto ordena, no predice.
+        </p>
+      </Section>
 
       {rivals.length === 0 ? (
         <Empty>
