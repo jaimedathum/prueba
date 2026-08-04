@@ -47,11 +47,25 @@ export interface ShieldingRules {
   clauseMultiplier: number;
 }
 
+/**
+ * Cuánto sube la cláusula por cada euro pagado al blindar.
+ *
+ * **Confirmado en la app oficial**: pagar 10M sobre una cláusula de 30M la
+ * deja en 50M, es decir `C + 2·Δ`. Coincide exactamente con la semántica que
+ * ya asumía la fórmula de blindaje, así que no hubo que tocarla.
+ *
+ * Sigue siendo configurable porque una liga privada podría cambiarlo y porque
+ * el juego podría retocarlo entre temporadas.
+ */
+export const DEFAULT_CLAUSE_MULTIPLIER = 2;
+
 export function requireShieldingRules(
   override?: Partial<ShieldingRules>,
 ): ShieldingRules {
   const multiplier =
-    override?.clauseMultiplier ?? readNumber("FANTASY_CLAUSE_MULTIPLIER");
+    override?.clauseMultiplier ??
+    readNumber("FANTASY_CLAUSE_MULTIPLIER") ??
+    DEFAULT_CLAUSE_MULTIPLIER;
 
   if (multiplier === null) {
     throw new UnconfirmedRuleError(

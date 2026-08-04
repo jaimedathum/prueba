@@ -32,11 +32,22 @@ el valor de las pujas**, y el rendimiento reciente del jugador.
 desde el mercado y el feed de actividad. Por eso el snapshot diario guarda
 `ownedCount` y `onMarket` además del valor.
 
-### Existe el blindaje
+### El blindaje multiplica por 2 lo pagado
 
-Se puede pagar para subir la cláusula de un jugador propio. El **cuánto** está
-en la sección pendiente, y es justo el número del que depende toda la
-recomendación de blindaje.
+Confirmado en la app oficial el 2026-08-04: pagar **10M** sobre una cláusula de
+**30M** la deja en **50M**. Es decir, la cláusula nueva es `C + 2·Δ`.
+
+Coincide exactamente con la semántica que ya asumía la fórmula de blindaje, así
+que no hubo que tocarla — solo fijar `k = 2` como valor por defecto. Sigue
+siendo configurable con `FANTASY_CLAUSE_MULTIPLIER` por si una liga privada lo
+cambia o el juego lo retoca entre temporadas.
+
+**Consecuencia**: el motor de blindaje ya se ejecuta. Y su conclusión más útil
+sigue siendo la contraintuitiva: **blindar casi nunca compensa**. Con `k = 2`,
+cada euro invertido solo aleja la cláusula 2€ de lo que un rival tendría que
+pagar, y eso rara vez mueve lo suficiente la probabilidad de que te ataquen
+como para justificar el desembolso. Solo sale a cuenta con jugadores cuya
+cláusula está muy por debajo de lo que valen para ti.
 
 ### Presupuesto inicial de referencia
 
@@ -48,20 +59,6 @@ saldo propio, que sí es visible.
 ## Pendiente de confirmar en la fase 0
 
 Cada una indica cómo confirmarla y qué se rompe si se asume mal.
-
-### 1. Coste del blindaje y multiplicador de la cláusula
-
-**Cómo**: observar la petición y la respuesta de `PUT .../buyout/player` al
-blindar a un jugador en la app oficial, y contrastar con las reglas publicadas.
-
-**Depende de esto**: la `k` de la fórmula de blindaje
-
-```
-E[beneficio de blindar Δ] = (V_yo − C) · [ p(C) − p(C + k·Δ) ] − Δ
-```
-
-Sin `k` no hay recomendación de blindaje posible. Es el número más importante
-de toda esta lista.
 
 ### 2. Fórmula de la cláusula inicial y su evolución
 
