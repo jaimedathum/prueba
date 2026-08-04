@@ -8,7 +8,7 @@ export function SetupNotice({ message }: { message: string }) {
     <main className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Fantasy Advisor</h1>
-        <p className="text-sm text-neutral-500">Falta configuración</p>
+        <p className="text-sm" style={{ color: "var(--muted)" }}>Falta configuración</p>
       </header>
 
       <pre className="overflow-x-auto rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
@@ -49,7 +49,7 @@ export function SetupNotice({ message }: { message: string }) {
         </li>
       </ol>
 
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm" style={{ color: "var(--muted)" }}>
         Las reglas del juego pendientes de confirmar están en{" "}
         <code>docs/reglas.md</code>. Ninguna se ha dado por supuesta en el
         código.

@@ -19,10 +19,10 @@ export const metadata: Metadata = {
  */
 export default function LoginPage() {
   return (
-    <main className="mx-auto max-w-lg space-y-6 p-6">
+    <main className="mx-auto max-w-lg space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Login inicial</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           Paso 2 de 3, y se hace una sola vez. Al terminar queda{" "}
           <a className="underline" href="/setup">
             traer los primeros datos

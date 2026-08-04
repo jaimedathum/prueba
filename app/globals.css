@@ -1,9 +1,71 @@
 @import "tailwindcss";
 
+/**
+ * Tokens de la interfaz.
+ *
+ * Se definen aquí y no sueltos por las páginas para que cambiar el aspecto sea
+ * tocar un sitio. Los nombres dicen para qué sirve cada color, no de qué color
+ * es: `--surface` sobrevive a cambiar de gris a beige; `--neutral-100` no.
+ */
 :root {
   color-scheme: light dark;
+
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --muted: #71717a;
+  --accent: #059669;
+
+  /* Estados. El mismo trío en toda la app: bien, ojo, mal. */
+  --good: #059669;
+  --warn: #b45309;
+  --bad: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #09090b;
+    --surface: #18181b;
+    --surface-2: #27272a;
+    --border: #27272a;
+    --text: #fafafa;
+    --muted: #a1a1aa;
+    --accent: #34d399;
+
+    --good: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
 }
 
 body {
-  @apply bg-white text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100;
+  background: var(--bg);
+  color: var(--text);
+  @apply antialiased;
+}
+
+/* Números en columnas que cuadran: dinero, puntos, probabilidades. */
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Las tablas anchas se desplazan dentro de su caja, nunca empujan la página.
+ * En un móvil de 375px una tabla de siete columnas rompe el layout entero si
+ * no se contiene aquí.
+ */
+.table-scroll {
+  @apply -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0;
+}
+
+code {
+  @apply rounded px-1 py-0.5 text-[0.9em];
+  background: var(--surface-2);
+}
+
+/* Área táctil mínima cómoda en móvil. */
+.tap {
+  min-height: 44px;
 }

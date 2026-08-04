@@ -88,7 +88,7 @@ export default async function OverridesPage() {
     <main className="space-y-8">
       <header>
         <h1 className="text-2xl font-semibold">Correcciones manuales</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           Se aplican encima de lo sincronizado. Una resincronización nunca las
           pisa.
         </p>
@@ -158,12 +158,12 @@ export default async function OverridesPage() {
       </form>
 
       <section>
-        <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Activas ({active.length})
         </h2>
 
         {active.length === 0 ? (
-          <p className="text-sm text-neutral-500">Ninguna. Todo viene de la API.</p>
+          <p className="text-sm" style={{ color: "var(--muted)" }}>Ninguna. Todo viene de la API.</p>
         ) : (
           <ul className="space-y-2">
             {active.map((override) => (
@@ -172,7 +172,7 @@ export default async function OverridesPage() {
                 className="flex items-center justify-between gap-4 rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
               >
                 <div>
-                  <code className="text-xs text-neutral-500">
+                  <code className="text-xs" style={{ color: "var(--muted)" }}>
                     {override.entity}:{override.entityId}
                   </code>
                   <div>
@@ -180,7 +180,7 @@ export default async function OverridesPage() {
                     {JSON.stringify(override.value)}
                   </div>
                   {override.reason ? (
-                    <p className="text-xs text-neutral-500">{override.reason}</p>
+                    <p className="text-xs" style={{ color: "var(--muted)" }}>{override.reason}</p>
                   ) : null}
                 </div>
 

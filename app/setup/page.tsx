@@ -24,15 +24,15 @@ export default function SetupPage() {
   const faltan = checks.filter((check) => !check.ok);
 
   return (
-    <main className="mx-auto max-w-lg space-y-6 p-6">
+    <main className="mx-auto max-w-lg space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Puesta en marcha</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           Tres pasos, una sola vez. Después esto se mantiene solo.
         </p>
       </header>
 
-      <section className="space-y-2 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+      <section className="space-y-2 rounded-xl border p-4 " style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
         <h2 className="font-medium">1. Configuración</h2>
         <ul className="space-y-1 text-sm">
           {checks.map((check) => (
@@ -51,9 +51,9 @@ export default function SetupPage() {
         )}
       </section>
 
-      <section className="space-y-2 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+      <section className="space-y-2 rounded-xl border p-4 " style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
         <h2 className="font-medium">2. Sesión</h2>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           Guarda el refresh token cifrado. Con cuenta de Google, Apple o
           Facebook hay que usar el login interactivo.
         </p>
@@ -69,7 +69,7 @@ export default function SetupPage() {
 
       <DiagnoseForm />
 
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm" style={{ color: "var(--muted)" }}>
         La sincronización solo <strong>lee</strong>. No hay ninguna ruta que
         puje, clausule ni blinde: la app recomienda y tú ejecutas en la app
         oficial.
