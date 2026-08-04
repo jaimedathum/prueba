@@ -44,6 +44,46 @@ export function normalizeStatus(raw: string | null): string {
   return STATUS_ALIASES[raw.toLowerCase().trim()] ?? "unknown";
 }
 
+/**
+ * Alias del id de equipo dentro de un jugador.
+ *
+ * Los comparten `parsePlayer` y `parseRealTeam` a propósito: son las dos
+ * caras del mismo dato, y cuando divergieron el resultado fue una violación
+ * de clave ajena que tumbaba la sincronización entera. Mientras salgan de
+ * aquí, es imposible que un jugador apunte a un equipo que no se ha guardado.
+ */
+const TEAM_ID_ALIASES = ["team.id", "teamId", "realTeamId"] as const;
+
+export interface ParsedRealTeam {
+  id: string;
+  name: string;
+  shortName: string | null;
+  badgeUrl: string | null;
+}
+
+/**
+ * Equipo real, extraído de la ficha de un jugador.
+ *
+ * Si hay id pero no nombre se usa el id como nombre. No es inventarse un
+ * dato: es admitir que no se sabe, conservando el vínculo del que dependen el
+ * modelo de equipos y el ajuste por rival. En cuanto una respuesta traiga el
+ * nombre de verdad, el upsert lo corrige.
+ */
+export function parseRealTeam(raw: unknown): ParsedRealTeam | null {
+  const source: Json = isJsonObject(raw) ? raw : {};
+  const m = new FieldMapper(source, "realTeam");
+
+  const id = m.string(...TEAM_ID_ALIASES);
+  if (!id) return null;
+
+  return {
+    id,
+    name: m.string("team.name", "teamName", "team.shortName") ?? id,
+    shortName: m.string("team.shortName", "teamShortName"),
+    badgeUrl: m.string("team.badgeColor", "team.badge", "teamBadge"),
+  };
+}
+
 export function parsePlayer(raw: unknown): {
   player: ParsedPlayer | null;
   mapper: FieldMapper;
@@ -65,7 +105,7 @@ export function parsePlayer(raw: unknown): {
       name,
       nickname: m.string("nickname", "shortName"),
       positionId,
-      realTeamId: m.string("team.id", "teamId", "realTeamId"),
+      realTeamId: m.string(...TEAM_ID_ALIASES),
       status: normalizeStatus(
         m.string("playerStatus", "status", "situation"),
       ),
