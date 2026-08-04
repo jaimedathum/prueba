@@ -2,6 +2,7 @@ import { getMarketDashboard } from "@/lib/engine/market-load";
 import { bidForProbability } from "@/lib/engine/auction";
 import { formatMoney } from "@/lib/queries";
 import { positionCode } from "@/lib/domain/positions";
+import { riskDots, type RiskLevel } from "@/lib/domain/risk";
 import { SetupNotice } from "../setup-notice";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +101,8 @@ export default async function MercadoPage() {
 
         {pujables.length === 0 ? (
           <p className="text-sm text-neutral-500">
-            Ningún jugador del mercado sale rentable ahora mismo.
+            Ningún jugador del mercado sale rentable ahora mismo. Abajo tienes
+            todos con el motivo de cada uno.
           </p>
         ) : (
           <ul className="space-y-3">
@@ -139,6 +141,49 @@ export default async function MercadoPage() {
               );
             })}
           </ul>
+        )}
+
+        {/* Todos, incluidos los descartados. Que un jugador desaparezca sin
+            explicación no es una recomendación: es un silencio. */}
+        {data.candidates.length > 0 && (
+          <details className="mt-4">
+            <summary className="cursor-pointer text-sm text-neutral-500">
+              Ver los {data.candidates.length} del mercado con su motivo y su
+              riesgo
+            </summary>
+            <ul className="mt-2 space-y-2">
+              {data.candidates.map((candidate) => (
+                <li
+                  key={candidate.playerId}
+                  className="rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <strong>
+                      {candidate.name}{" "}
+                      <span className="font-normal text-neutral-500">
+                        {positionCode(candidate.positionId)} ·{" "}
+                        {formatMoney(candidate.marketValue)}
+                      </span>
+                    </strong>
+                    <span className="text-xs tabular-nums text-neutral-500">
+                      {candidate.auction.optimalBid !== null
+                        ? `pujar ${formatMoney(candidate.auction.optimalBid)}`
+                        : "no pujar"}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                    <Riesgo etiqueta="Perder dinero" nivel={candidate.economicRisk} />
+                    <Riesgo etiqueta="No puntuar" nivel={candidate.sportingRisk} />
+                  </div>
+
+                  <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                    {candidate.reason}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
 
         <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-neutral-500">
@@ -207,5 +252,30 @@ export default async function MercadoPage() {
         </footer>
       ) : null}
     </main>
+  );
+}
+
+/**
+ * Indicador de riesgo de 1 a 6. La confianza se enseña, no se esconde: un
+ * riesgo bajo calculado sin datos suficientes no vale lo mismo que uno
+ * calculado con un modelo validado, y presentarlos igual engañaría.
+ */
+function Riesgo({ etiqueta, nivel }: { etiqueta: string; nivel: RiskLevel }) {
+  return (
+    <span
+      className={nivel.confident ? "" : "opacity-60"}
+      title={
+        nivel.confident
+          ? `${etiqueta}: riesgo ${nivel.label}`
+          : `${etiqueta}: todavía sin datos suficientes para fiarse`
+      }
+    >
+      <span className="text-neutral-500">{etiqueta}</span>{" "}
+      <span className="tabular-nums">{riskDots(nivel.score)}</span>{" "}
+      <span className="text-neutral-500">
+        {nivel.score}/6 {nivel.label}
+        {nivel.confident ? "" : " · sin datos suficientes"}
+      </span>
+    </span>
   );
 }
