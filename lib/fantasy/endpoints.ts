@@ -11,14 +11,13 @@
 /**
  * Base de la API del juego.
  *
- * Sin confirmar: hay un proyecto de terceros que apunta a
- * `https://fantasy-api.llt-services.com/api` (con prefijo `/api`) mientras que
- * aquí se usa la raíz. Es configurable justo por eso: si la sincronización
- * devuelve 404 en TODAS las rutas —no en una suelta— es este prefijo, y se
- * arregla con una variable de entorno en vez de tocar código.
+ * **El prefijo `/api` es obligatorio**, confirmado contra la API real el
+ * 2026-08-03: la misma ruta `/v4/user/me` da 404 sin él y 200 con él. Se deja
+ * configurable por si vuelve a moverse, y `lib/fantasy/probe.ts` sabe
+ * diagnosticarlo si un día todas las rutas empiezan a dar 404.
  */
 export const API_BASE = (
-  process.env.FANTASY_API_BASE || "https://fantasy-api.llt-services.com"
+  process.env.FANTASY_API_BASE || "https://fantasy-api.llt-services.com/api"
 ).replace(/\/$/, "");
 
 /**

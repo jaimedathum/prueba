@@ -236,12 +236,36 @@ cerrar los pendientes de arriba (sobre todo la `k` del blindaje y el punto 8),
 no como arquitectura permanente: obligaría a tener el móvil emparejado en cada
 sincronización y moriría en cuanto la app active certificate pinning.
 
-### Sin confirmar: el prefijo `/api`
+### Confirmado: el prefijo `/api` es obligatorio
 
-LaLigaApp apunta a `https://fantasy-api.llt-services.com/api` mientras que aquí
-se usa la raíz. Los nombres de ruta coinciden exactamente en todo lo demás. Si
-la sincronización da **404 en todas las rutas** —no en una suelta— es esto, y se
-arregla poniendo `FANTASY_API_BASE` con el sufijo.
+Verificado el 2026-08-03 con `lib/fantasy/probe.ts` contra la API real. La
+misma ruta, con y sin prefijo:
+
+| Base | Ruta | Estado |
+|---|---|---|
+| `https://fantasy-api.llt-services.com` | `/v4/user/me` | 404 |
+| `https://fantasy-api.llt-services.com/api` | `/v4/user/me` | **200** |
+| `https://fantasy-api.llt-services.com/api` | `/v1/competition/1/leagues` | **200** |
+
+Ya es el valor por defecto. De paso queda confirmado que
+**`FANTASY_COMPETITION_ID=1` es correcto**, que era la otra sospechosa del 404.
+
+### Confirmado: `/v4/user/me` no trae equipos
+
+La respuesta real es el usuario pelado:
+
+```json
+{ "id": "9887891", "managerName": "...", "locale": "es",
+  "avatar": "", "banned": false, "region": { "id": "1" } }
+```
+
+**El `id` es el del usuario, no el del equipo**, así que no sirve para saber
+qué plantilla es la tuya. Confundirlos daría un error silencioso: la app
+enseñaría la plantilla de otro como si fuera la tuya.
+
+La vía que sí funciona es cruzar `managerName` con la clasificación, y solo
+cuando la coincidencia es **única** (`matchMyTeamByName`). Si hay empate de
+nombres no se elige: se avisa y se pide `FANTASY_TEAM_ID`.
 
 ---
 
