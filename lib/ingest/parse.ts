@@ -136,16 +136,37 @@ export function parseManager(
   const m = new FieldMapper(source, "manager");
 
   const id = m.string("id", "teamId", "team.id");
-  const teamName = m.string("name", "teamName", "team.name");
+  // Sin id no hay entidad posible. El nombre, en cambio, es cosmético: perder
+  // un manager entero por no encontrar cómo se llama su equipo dejaba la liga
+  // vacía y con ella las plantillas, los snapshots y la caja. Confirmado en la
+  // práctica: la clasificación real trae el id pero ninguno de los alias de
+  // nombre que se probaban.
+  if (!id) return { manager: null, mapper: m };
 
-  if (!id || !teamName) return { manager: null, mapper: m };
+  const managerName = m.string(
+    "manager.managerName",
+    "managerName",
+    "team.manager.managerName",
+    "user.name",
+  );
+
+  const teamName =
+    m.string(
+      "name",
+      "teamName",
+      "team.name",
+      "team.teamName",
+      "teamNameLarge",
+    ) ??
+    managerName ??
+    `Equipo ${id}`;
 
   return {
     manager: {
       id,
       leagueId,
       teamName,
-      managerName: m.string("manager.managerName", "managerName", "user.name"),
+      managerName,
       // Solo llega para tu propio equipo; para los rivales casi nunca.
       reportedBalance: m.number("teamMoney", "balance", "money"),
       teamValue: m.number("teamValue", "value"),
@@ -248,8 +269,21 @@ export function parseMatch(
   const source: Json = isJsonObject(raw) ? raw : {};
   const m = new FieldMapper(source, "match");
 
-  const homeTeamId = m.string("local.id", "homeTeam.id", "localTeamId");
-  const awayTeamId = m.string("visitor.id", "awayTeam.id", "visitorTeamId");
+  // `localId` y `visitorId` son los que trae el calendario de verdad: sin
+  // ellos el parser abortaba antes de leer nada más, y por eso el informe de
+  // mapeo daba por "sin usar" campos que sí se piden más abajo.
+  const homeTeamId = m.string(
+    "localId",
+    "local.id",
+    "homeTeam.id",
+    "localTeamId",
+  );
+  const awayTeamId = m.string(
+    "visitorId",
+    "visitor.id",
+    "awayTeam.id",
+    "visitorTeamId",
+  );
   if (!homeTeamId || !awayTeamId) return { match: null, mapper: m };
 
   const homeGoals = m.number("localScore", "homeGoals", "local.score");
@@ -366,11 +400,23 @@ export function parseActivityEvent(
   const occurredAt = m.date("date", "operationDate", "createdAt", "timestamp");
   if (!occurredAt) return { event: null, mapper: m };
 
+  // El feed real identifica el tipo con `activityTypeId`, un número cuyo
+  // significado todavía no está confirmado: hacen falta más eventos de los que
+  // tiene una liga recién creada. Se lee igualmente para que el clasificador
+  // pueda reconocerlo en cuanto se sepa; mientras, cae en "unknown" y el motor
+  // de caja ensancha la banda, que es el comportamiento correcto.
   const type = classifyActivityType(
-    m.string("type", "operation", "operationType", "action"),
+    m.string("type", "operation", "operationType", "action", "activityTypeId"),
   );
-  const managerId = m.string("team.id", "teamId", "user.id", "buyerTeam.id");
+  const managerId = m.string(
+    "user1Id",
+    "team.id",
+    "teamId",
+    "user.id",
+    "buyerTeam.id",
+  );
   const counterpartyManagerId = m.string(
+    "user2Id",
     "sellerTeam.id",
     "counterpartyTeamId",
     "toTeam.id",
