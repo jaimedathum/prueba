@@ -1,6 +1,8 @@
 import { getLineupDashboard } from "@/lib/engine/lineup-load";
 import { positionCode } from "@/lib/domain/positions";
 import { SetupNotice } from "../setup-notice";
+import { Card, Empty, Notice, Page, Section, Stat, StatGrid } from "../ui";
+import { Pitch } from "./pitch";
 
 export const dynamic = "force-dynamic";
 
@@ -25,60 +27,74 @@ export default async function AlineacionPage() {
 
   if (!data) {
     return (
-      <main className="space-y-4">
-        <h1 className="text-2xl font-semibold">Alineación</h1>
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
-          Todavía no se ha identificado tu equipo. Ejecuta{" "}
-          <code>npm run sync</code> primero.
-        </p>
-      </main>
+      <Page title="Alineación">
+        <Empty>
+          Todavía no se ha identificado tu equipo dentro de la liga. Pulsa
+          Sincronizar arriba, y si sigue igual mira los avisos en{" "}
+          <a className="underline" href="/setup">
+            la puesta en marcha
+          </a>
+          .
+        </Empty>
+      </Page>
     );
   }
 
   const { lineup, model, nextMatchday, warnings, explanations } = data;
 
   return (
-    <main className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold">Alineación</h1>
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
-          {nextMatchday ? `Jornada ${nextMatchday}` : "Sin jornada pendiente"} ·
-          modelo ajustado con {model.matches} partidos
-          {model.converged ? "" : " (insuficientes)"}
-        </p>
-      </header>
-
+    <Page
+      title="Alineación"
+      subtitle={`${nextMatchday ? `Jornada ${nextMatchday}` : "Sin jornada pendiente"} · modelo ajustado con ${model.matches} partidos${model.converged ? "" : " (insuficientes)"}`}
+    >
       {warnings.length > 0 ? (
-        <section className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950">
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide">
-            Lo que falta y qué se pierde por ello
-          </h2>
+        <Notice title="Lo que falta y qué se pierde por ello">
           <ul className="list-disc space-y-1 pl-5">
             {warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
           </ul>
-        </section>
+        </Notice>
       ) : null}
 
       {!lineup ? (
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
+        <Empty>
           No hay jugadores suficientes para formar un once con las formaciones
           disponibles.
-        </p>
+        </Empty>
       ) : (
         <>
-          <section>
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-                Once óptimo · {lineup.formation.name}
-              </h2>
-              <span className="text-sm nums">
-                {lineup.expectedPoints.toFixed(1)} puntos esperados
-              </span>
-            </div>
+          <Section title={`Once óptimo · ${lineup.formation.name}`}>
+            <Pitch players={lineup.starters} />
 
-            <div className="table-scroll">
+            <Card>
+              <StatGrid>
+                <Stat
+                  label="Puntos esperados"
+                  value={lineup.expectedPoints.toFixed(1)}
+                />
+                <Stat label="Formación" value={lineup.formation.name} />
+                <Stat
+                  label="Se espera que no jueguen"
+                  value={lineup.expectedMissing.toFixed(1)}
+                  hint="de los 11"
+                  tone={lineup.expectedMissing >= 2 ? "warn" : "good"}
+                />
+                <Stat label="Jornada" value={nextMatchday ?? "—"} />
+              </StatGrid>
+            </Card>
+
+            <p className="text-xs" style={{ color: "var(--muted)" }}>
+              En el campo, el número es lo que se espera que puntúe cada uno.
+              El color avisa de quién puede dejarte a cero: blanco va bien,
+              ámbar es dudoso y rojo es probable que no juegue.
+            </p>
+
+            <details>
+              <summary className="cursor-pointer text-sm" style={{ color: "var(--muted)" }}>
+                Ver el detalle de los once, con el motivo de cada uno
+              </summary>
+            <div className="table-scroll mt-2">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-neutral-200 text-left text-xs uppercase text-neutral-500 dark:border-neutral-800">
@@ -113,13 +129,8 @@ export default async function AlineacionPage() {
                 </tbody>
               </table>
             </div>
-
-            <p className="mt-3 text-xs text-neutral-500">
-              Se espera que {lineup.expectedMissing.toFixed(1)} de los 11 no
-              lleguen a jugar. El riesgo de cero es la probabilidad de que un
-              jugador no salga: es lo que decide si merece la pena arriesgar.
-            </p>
-          </section>
+            </details>
+          </Section>
 
           <section>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
@@ -129,10 +140,10 @@ export default async function AlineacionPage() {
               {lineup.alternatives.map((alternative) => (
                 <li
                   key={alternative.formation}
-                  className="flex justify-between gap-4 border-b border-neutral-100 py-1 dark:border-neutral-900"
+                  className="flex justify-between gap-4 border-b py-1" style={{ borderColor: "var(--border)" }}
                 >
                   <span>{alternative.formation}</span>
-                  <span className="nums text-neutral-500">
+                  <span className="nums" style={{ color: "var(--muted)" }}>
                     {alternative.expectedPoints.toFixed(1)}
                     {alternative.cost > 0
                       ? ` (−${alternative.cost.toFixed(1)})`
@@ -151,15 +162,15 @@ export default async function AlineacionPage() {
               {lineup.bench.map((player) => (
                 <li
                   key={player.playerId}
-                  className="flex justify-between gap-4 border-b border-neutral-100 py-1 dark:border-neutral-900"
+                  className="flex justify-between gap-4 border-b py-1" style={{ borderColor: "var(--border)" }}
                 >
                   <span>
                     {player.name}{" "}
-                    <span className="text-neutral-500">
+                    <span style={{ color: "var(--muted)" }}>
                       {positionCode(player.positionId)}
                     </span>
                   </span>
-                  <span className="nums text-neutral-500">
+                  <span className="nums" style={{ color: "var(--muted)" }}>
                     {player.expectedPoints.toFixed(1)}
                   </span>
                 </li>
@@ -169,7 +180,7 @@ export default async function AlineacionPage() {
         </>
       )}
 
-      <footer className="border-t border-neutral-200 pt-4 text-xs text-neutral-500 dark:border-neutral-800">
+      <footer className="border-t pt-4 text-xs" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
         <p>
           El once se resuelve exacto: se enumeran todas las formaciones legales
           y dentro de cada una se asigna por flujo de coste mínimo. No es una
@@ -181,7 +192,7 @@ export default async function AlineacionPage() {
           Corrección de marcadores bajos ρ = {model.rho.toFixed(3)}.
         </p>
       </footer>
-    </main>
+    </Page>
   );
 }
 
