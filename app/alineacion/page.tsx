@@ -2,7 +2,7 @@ import { getLineupDashboard } from "@/lib/engine/lineup-load";
 import { positionCode } from "@/lib/domain/positions";
 import { SetupNotice } from "../setup-notice";
 import { Card, Empty, Notice, Page, Section, Stat, StatGrid } from "../ui";
-import { Pitch } from "./pitch";
+import { Pitch } from "../pitch";
 
 export const dynamic = "force-dynamic";
 
