@@ -27,7 +27,7 @@ export default async function RiesgoPage() {
     return (
       <main className="space-y-4">
         <h1 className="text-2xl font-semibold">Riesgo</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           Todavía no se ha identificado tu equipo dentro de la liga. Ejecuta{" "}
           <code>npm run sync</code> primero.
         </p>
@@ -43,7 +43,7 @@ export default async function RiesgoPage() {
     <main className="space-y-10">
       <header>
         <h1 className="text-2xl font-semibold">Riesgo y cláusulas</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           Horizonte {data.horizonDays} días · {data.observedDays} días de
           histórico · tu caja {formatMoney(data.myCash)}
         </p>
@@ -61,7 +61,7 @@ export default async function RiesgoPage() {
           Calibración
         </h2>
         <p>{data.calibration.note}</p>
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
           Tu saldo es el único visible, así que es el patrón contra el que se
           mide el modelo. Si no clava el tuyo, no acierta el de nadie.
         </p>
@@ -69,10 +69,10 @@ export default async function RiesgoPage() {
 
       {/* --- Caja de los rivales ------------------------------------ */}
       <section>
-        <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Caja estimada de los rivales
         </h2>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-left text-xs uppercase text-neutral-500 dark:border-neutral-800">
@@ -92,13 +92,13 @@ export default async function RiesgoPage() {
                   <td className="py-2 pr-3">
                     {data.managerNames.get(band.managerId) ?? band.managerId}
                   </td>
-                  <td className="py-2 pr-3 text-right tabular-nums text-neutral-500">
+                  <td className="py-2 pr-3 text-right nums text-neutral-500">
                     {formatMoney(band.min)}
                   </td>
-                  <td className="py-2 pr-3 text-right font-medium tabular-nums">
+                  <td className="py-2 pr-3 text-right font-medium nums">
                     {formatMoney(band.point)}
                   </td>
-                  <td className="py-2 pr-3 text-right tabular-nums text-neutral-500">
+                  <td className="py-2 pr-3 text-right nums text-neutral-500">
                     {formatMoney(band.max)}
                   </td>
                   <td className="py-2">
@@ -126,7 +126,7 @@ export default async function RiesgoPage() {
 
       {/* --- Blindaje ------------------------------------------------ */}
       <section>
-        <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Tu plantilla
         </h2>
 
@@ -160,7 +160,7 @@ export default async function RiesgoPage() {
                     <strong>{shield.name}</strong>
                     <span className="flex items-center gap-2">
                       <Verdict verdict={shield.verdict} />
-                      <span className="tabular-nums text-neutral-500">
+                      <span className="nums text-neutral-500">
                         riesgo {(shield.currentRisk * 100).toFixed(1)}%
                       </span>
                     </span>
@@ -177,7 +177,7 @@ export default async function RiesgoPage() {
 
       {/* --- Clausulazos --------------------------------------------- */}
       <section>
-        <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Clausulazos
         </h2>
         <ul className="space-y-2">
@@ -190,7 +190,7 @@ export default async function RiesgoPage() {
                 <strong>{attack.name}</strong>
                 <span className="flex items-center gap-2">
                   <AttackBadge verdict={attack.verdict} />
-                  <span className="tabular-nums text-neutral-500">
+                  <span className="nums text-neutral-500">
                     {formatMoney(attack.clause)}
                   </span>
                 </span>

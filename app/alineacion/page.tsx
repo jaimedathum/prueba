@@ -27,7 +27,7 @@ export default async function AlineacionPage() {
     return (
       <main className="space-y-4">
         <h1 className="text-2xl font-semibold">Alineación</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           Todavía no se ha identificado tu equipo. Ejecuta{" "}
           <code>npm run sync</code> primero.
         </p>
@@ -41,7 +41,7 @@ export default async function AlineacionPage() {
     <main className="space-y-8">
       <header>
         <h1 className="text-2xl font-semibold">Alineación</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           {nextMatchday ? `Jornada ${nextMatchday}` : "Sin jornada pendiente"} ·
           modelo ajustado con {model.matches} partidos
           {model.converged ? "" : " (insuficientes)"}
@@ -62,7 +62,7 @@ export default async function AlineacionPage() {
       ) : null}
 
       {!lineup ? (
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           No hay jugadores suficientes para formar un once con las formaciones
           disponibles.
         </p>
@@ -73,12 +73,12 @@ export default async function AlineacionPage() {
               <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
                 Once óptimo · {lineup.formation.name}
               </h2>
-              <span className="text-sm tabular-nums">
+              <span className="text-sm nums">
                 {lineup.expectedPoints.toFixed(1)} puntos esperados
               </span>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-neutral-200 text-left text-xs uppercase text-neutral-500 dark:border-neutral-800">
@@ -99,10 +99,10 @@ export default async function AlineacionPage() {
                       <td className="py-2 pr-3 text-neutral-500">
                         {positionCode(player.positionId)}
                       </td>
-                      <td className="py-2 pr-3 text-right tabular-nums">
+                      <td className="py-2 pr-3 text-right nums">
                         {player.expectedPoints.toFixed(1)}
                       </td>
-                      <td className="py-2 pr-3 text-right tabular-nums">
+                      <td className="py-2 pr-3 text-right nums">
                         <RiskCell risk={player.riskOfZero} />
                       </td>
                       <td className="py-2 text-xs text-neutral-500">
@@ -122,7 +122,7 @@ export default async function AlineacionPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
               Qué cuesta cambiar de formación
             </h2>
             <ul className="space-y-1 text-sm">
@@ -132,7 +132,7 @@ export default async function AlineacionPage() {
                   className="flex justify-between gap-4 border-b border-neutral-100 py-1 dark:border-neutral-900"
                 >
                   <span>{alternative.formation}</span>
-                  <span className="tabular-nums text-neutral-500">
+                  <span className="nums text-neutral-500">
                     {alternative.expectedPoints.toFixed(1)}
                     {alternative.cost > 0
                       ? ` (−${alternative.cost.toFixed(1)})`
@@ -144,7 +144,7 @@ export default async function AlineacionPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
               Banquillo
             </h2>
             <ul className="space-y-1 text-sm">
@@ -159,7 +159,7 @@ export default async function AlineacionPage() {
                       {positionCode(player.positionId)}
                     </span>
                   </span>
-                  <span className="tabular-nums text-neutral-500">
+                  <span className="nums text-neutral-500">
                     {player.expectedPoints.toFixed(1)}
                   </span>
                 </li>

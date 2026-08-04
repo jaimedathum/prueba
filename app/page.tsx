@@ -1,14 +1,19 @@
 import { getDashboardData, formatMoney } from "@/lib/queries";
 import { SetupNotice } from "./setup-notice";
+import { Badge, Card, Empty, Page, Section, Stat, StatGrid } from "./ui";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Panel mínimo de la fase 0: estado de la sincronización y plantilla propia.
+ * Plantilla propia y estado de la ingesta.
  *
- * La interfaz de verdad llega con los motores (fases 1-3). Lo que importa
- * ahora es poder verificar, jugador a jugador, que lo sincronizado coincide con
- * la app oficial: es el test de aceptación de toda la ingesta.
+ * Es la pantalla de comprobación: sirve para verificar jugador a jugador que
+ * lo sincronizado coincide con la app oficial. Por eso enseña la cláusula y su
+ * ratio, que es lo que no se ve cómodamente en el juego.
+ *
+ * En móvil los jugadores van en tarjetas y no en tabla: seis columnas en 375px
+ * obligan a desplazar en horizontal para leer una fila, que es justo lo que
+ * hace inservible una tabla en el bolsillo.
  */
 export default async function Home() {
   let data;
@@ -23,148 +28,144 @@ export default async function Home() {
   }
 
   const { me, squad, lastSync } = data;
+  const enRiesgo = squad.filter(
+    (p) => p.clauseRatio !== null && p.clauseRatio < 1,
+  ).length;
 
   return (
-    <main className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold">Fantasy Advisor</h1>
-        <p className="text-sm text-neutral-500">
-          {me ? me.teamName : "Equipo sin identificar"}
-          {me?.reportedBalance !== null && me !== null
-            ? ` · saldo ${formatMoney(me.reportedBalance)}`
-            : ""}
-        </p>
-      </header>
+    <Page
+      title={me ? me.teamName : "Equipo sin identificar"}
+      subtitle={
+        me?.reportedBalance != null
+          ? `Saldo ${formatMoney(me.reportedBalance)}`
+          : "Saldo no disponible todavía"
+      }
+    >
+      <Card>
+        <StatGrid>
+          <Stat label="Jugadores" value={squad.length} />
+          <Stat
+            label="Cláusula por debajo del valor"
+            value={enRiesgo}
+            tone={enRiesgo > 0 ? "warn" : "good"}
+            hint={enRiesgo > 0 ? "salen baratos a un rival" : "ninguno barato"}
+          />
+          <Stat
+            label="Última sincronización"
+            value={
+              lastSync
+                ? lastSync.startedAt.toLocaleTimeString("es-ES", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "—"
+            }
+            hint={
+              lastSync
+                ? lastSync.startedAt.toLocaleDateString("es-ES")
+                : "sin ejecutar"
+            }
+            tone={lastSync?.status === "failed" ? "bad" : undefined}
+          />
+          <Stat
+            label="Estado"
+            value={lastSync ? estadoLegible(lastSync.status) : "—"}
+            tone={
+              lastSync?.status === "ok"
+                ? "good"
+                : lastSync?.status === "failed"
+                  ? "bad"
+                  : "muted"
+            }
+          />
+        </StatGrid>
 
-      <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Última sincronización
-        </h2>
-        {lastSync ? (
-          <div className="space-y-1 text-sm">
-            <p>
-              <StatusBadge status={lastSync.status} />{" "}
-              <time dateTime={lastSync.startedAt.toISOString()}>
-                {lastSync.startedAt.toLocaleString("es-ES")}
-              </time>
-            </p>
-            {lastSync.error ? (
-              <p className="text-red-600 dark:text-red-400">{lastSync.error}</p>
-            ) : null}
-            {lastSync.stats ? (
-              <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-4">
-                {Object.entries(lastSync.stats).map(([key, value]) => (
-                  <div key={key} className="flex justify-between gap-2">
-                    <dt className="text-neutral-500">{key}</dt>
-                    <dd className="tabular-nums">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-sm text-neutral-500">
-            Todavía no se ha ejecutado ninguna sincronización. Lanza{" "}
-            <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">
-              npm run sync
-            </code>
-            .
+        {lastSync?.error && (
+          <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
+            {lastSync.error}
           </p>
         )}
-      </section>
+      </Card>
 
-      <section>
-        <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Mi plantilla ({squad.length})
-        </h2>
-
+      <Section
+        title={`Mi plantilla (${squad.length})`}
+        hint="El ratio es cláusula ÷ valor. Por debajo de 1, el jugador le sale barato a un rival."
+      >
         {squad.length === 0 ? (
-          <p className="text-sm text-neutral-500">
-            Sin datos todavía. Comprueba que la sincronización ha identificado
-            tu equipo dentro de la liga.
-          </p>
+          <Empty>
+            Sin jugadores todavía. Comprueba en{" "}
+            <a className="underline" href="/setup">
+              la puesta en marcha
+            </a>{" "}
+            que la sincronización ha identificado tu equipo dentro de la liga.
+          </Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-neutral-200 text-left text-xs uppercase text-neutral-500 dark:border-neutral-800">
-                  <th className="py-2 pr-3">Jugador</th>
-                  <th className="py-2 pr-3">Pos</th>
-                  <th className="py-2 pr-3 text-right">Valor</th>
-                  <th className="py-2 pr-3 text-right">Cláusula</th>
-                  <th className="py-2 pr-3 text-right">Ratio</th>
-                  <th className="py-2">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {squad.map((row) => (
-                  <tr
-                    key={row.playerId}
-                    className="border-b border-neutral-100 dark:border-neutral-900"
-                  >
-                    <td className="py-2 pr-3">
-                      {row.name}
-                      {row.overriddenFields.length > 0 ? (
+          <ul className="space-y-2">
+            {squad.map((row) => (
+              <li key={row.playerId}>
+                <Card className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate font-medium">{row.name}</span>
+                      {row.overriddenFields.length > 0 && (
                         <span
-                          className="ml-2 rounded bg-amber-100 px-1 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200"
                           title={`Corregido a mano: ${row.overriddenFields.join(", ")}`}
                         >
-                          manual
+                          <Badge tone="warn">manual</Badge>
                         </span>
-                      ) : null}
-                    </td>
-                    <td className="py-2 pr-3 text-neutral-500">{row.position}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {formatMoney(row.marketValue)}
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {formatMoney(row.buyoutClause)}
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      <ClauseRatio ratio={row.clauseRatio} />
-                    </td>
-                    <td className="py-2 text-neutral-500">{row.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                      )}
+                      {row.status !== "ok" && (
+                        <Badge tone={row.status === "injured" ? "bad" : "warn"}>
+                          {row.status}
+                        </Badge>
+                      )}
+                    </div>
+                    <div
+                      className="mt-0.5 text-xs"
+                      style={{ color: "var(--muted)" }}
+                    >
+                      {row.position} · valor {formatMoney(row.marketValue)}
+                    </div>
+                  </div>
 
-        <p className="mt-3 text-xs text-neutral-500">
-          El ratio es cláusula ÷ valor. Por debajo de 1 el jugador sale barato
-          para un rival. El radar de riesgo real —quién tiene caja para pagarla
-          y a quién le interesa— llega en la fase 1.
-        </p>
-      </section>
-    </main>
+                  <div className="shrink-0 text-right">
+                    <div className="nums text-sm font-medium">
+                      {formatMoney(row.buyoutClause)}
+                    </div>
+                    <div className="text-xs">
+                      <ClauseRatio ratio={row.clauseRatio} />
+                    </div>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+    </Page>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    ok: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    failed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    running: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  };
+function estadoLegible(status: string): string {
   return (
-    <span
-      className={`rounded px-2 py-0.5 text-xs ${styles[status] ?? "bg-neutral-100 dark:bg-neutral-800"}`}
-    >
-      {status}
-    </span>
+    { ok: "Correcta", failed: "Con error", running: "En curso" }[status] ??
+    status
   );
 }
 
 function ClauseRatio({ ratio }: { ratio: number | null }) {
-  if (ratio === null) return <span className="text-neutral-400">—</span>;
-  // Solo un aviso visual: la decisión de blindar necesita la caja de los
-  // rivales y el coste real del blindaje, que son fase 1.
+  if (ratio === null) {
+    return <span style={{ color: "var(--muted)" }}>sin cláusula</span>;
+  }
+
+  // Solo un aviso visual: decidir si blindar necesita además la caja de los
+  // rivales y a quién le interesa el jugador, que es lo que hay en /riesgo.
   const tone =
-    ratio < 1
-      ? "text-red-600 dark:text-red-400"
-      : ratio < 1.5
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-neutral-500";
-  return <span className={tone}>{ratio.toFixed(2)}×</span>;
+    ratio < 1 ? "var(--bad)" : ratio < 1.5 ? "var(--warn)" : "var(--muted)";
+
+  return (
+    <span className="nums" style={{ color: tone }}>
+      {ratio.toFixed(2)}× cláusula
+    </span>
+  );
 }
