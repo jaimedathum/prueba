@@ -54,6 +54,9 @@ function candidate(overrides: Partial<MarketCandidate> = {}): MarketCandidate {
     positionId: 4,
     marketValue: 8_000_000,
     expectedPoints: 6,
+    economicRisk: { score: 2, label: "bajo", confident: true },
+    sportingRisk: { score: 2, label: "bajo", confident: true },
+    reason: "Sale a cuenta.",
     auction: {
       optimalBid: 9_000_000,
       probabilityOfWinning: 0.7,

@@ -9,6 +9,7 @@ import {
   rosterEntries,
 } from "@/lib/db/schema";
 import { bidMultiplier } from "@/lib/domain/activity";
+import { riskLevel, type RiskLevel } from "@/lib/domain/risk";
 import { FALLBACK_FORMATIONS, type PositionCode } from "@/lib/domain/positions";
 import {
   calibrate,
@@ -67,6 +68,15 @@ export interface MarketCandidate {
   expectedPoints: number;
   auction: AuctionResult;
   speculation: SpeculationResult;
+  /** Riesgo de perder dinero: de la distribución del modelo de precios. */
+  economicRisk: RiskLevel;
+  /** Riesgo de no puntuar: de la probabilidad de no jugar. */
+  sportingRisk: RiskLevel;
+  /**
+   * Por qué no sale a cuenta, cuando no sale. Que un jugador desaparezca de
+   * la lista sin explicación no es una recomendación, es un silencio.
+   */
+  reason: string;
 }
 
 export interface MarketDashboard {
@@ -357,34 +367,58 @@ export async function getMarketDashboard(): Promise<MarketDashboard | null> {
         option.expectedValueChange +
         option.saleValue;
 
+      const auction = optimalBid({
+        marketValue: option.saleValue,
+        myValuation: valuation,
+        cashCostMultiplier: transfers.cashCostMultiplier,
+        rivals: rivalsFor(option.positionId, option.saleValue),
+        leagueMultipliers,
+        availableCash: myCash,
+      });
+
+      const speculation = evaluateSpeculation({
+        playerId: option.playerId,
+        name: option.name,
+        marketValue: option.saleValue,
+        prediction,
+        cashCostMultiplier: transfers.cashCostMultiplier,
+        // Con la plantilla llena, ocupar una plaza cuesta lo que rendiría
+        // el jugador más flojo al que sustituiría.
+        slotCost: 0,
+        lossTolerance: 0.25,
+        // Regla nº 7 sin confirmar: se asume salida casi líquida y se dice.
+        liquidityFactor: 0.95,
+        availableCash: myCash,
+      });
+
       return {
         playerId: option.playerId,
         name: option.name,
         positionId: option.positionId,
         marketValue: option.saleValue,
         expectedPoints: option.expectedPoints,
-        auction: optimalBid({
-          marketValue: option.saleValue,
-          myValuation: valuation,
-          cashCostMultiplier: transfers.cashCostMultiplier,
-          rivals: rivalsFor(option.positionId, option.saleValue),
-          leagueMultipliers,
-          availableCash: myCash,
-        }),
-        speculation: evaluateSpeculation({
-          playerId: option.playerId,
-          name: option.name,
-          marketValue: option.saleValue,
-          prediction,
-          cashCostMultiplier: transfers.cashCostMultiplier,
-          // Con la plantilla llena, ocupar una plaza cuesta lo que rendiría
-          // el jugador más flojo al que sustituiría.
-          slotCost: 0,
-          lossTolerance: 0.25,
-          // Regla nº 7 sin confirmar: se asume salida casi líquida y se dice.
-          liquidityFactor: 0.95,
-          availableCash: myCash,
-        }),
+        auction,
+        speculation,
+        // La confianza va aparte de la puntuación: un riesgo bajo calculado
+        // con un modelo sin validar no vale lo mismo que uno validado, y
+        // enseñarlos igual sería una cifra estrecha e inventada.
+        economicRisk: riskLevel(
+          speculation.probabilityOfLoss,
+          priceModel.usable,
+        ),
+        sportingRisk: riskLevel(
+          option.riskOfZero,
+          // Sin jornadas jugadas no hay base para hablar de titularidad.
+          option.expectedPoints > 0,
+        ),
+        reason:
+          auction.optimalBid !== null
+            ? auction.reason
+            : euroPerPoint === null
+              ? "Sin jornadas jugadas no se puede valorar lo que aporta en " +
+                "puntos, así que su valor deportivo cuenta como cero y " +
+                "ninguna puja por encima del valor de mercado sale a cuenta."
+              : auction.reason,
       };
     })
     .sort(

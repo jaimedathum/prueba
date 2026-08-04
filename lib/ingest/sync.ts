@@ -325,10 +325,11 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       (parsedManagers.length === 1 ? parsedManagers[0]!.id : null);
 
     if (db && myTeamId && parsedManagers.some((m) => m.id === myTeamId)) {
-      await db
-        .update(managers)
-        .set({ isMe: false })
-        .where(eq(managers.leagueId, leagueId));
+      // Sin filtrar por liga a propósito. Los paneles leen `isMe` con un
+      // `limit 1`, así que una marca superviviente de una liga anterior —al
+      // dejarla o al cambiarse— haría que la app siguiera enseñando aquel
+      // equipo, con datos que ya nadie actualiza. Solo puede haber un "yo".
+      await db.update(managers).set({ isMe: false });
       await db
         .update(managers)
         .set({ isMe: true })

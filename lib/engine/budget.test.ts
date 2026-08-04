@@ -1,3 +1,4 @@
+import { requireShieldingRules } from "./rules";
 import { describe, expect, it } from "vitest";
 import {
   boundUnknownAmount,
@@ -298,5 +299,24 @@ describe("probabilityCanAfford", () => {
     const exacta = { ...band, min: 20_000_000, max: 20_000_000 };
     expect(probabilityCanAfford(exacta, 15_000_000)).toBe(1);
     expect(probabilityCanAfford(exacta, 25_000_000)).toBe(0);
+  });
+});
+
+describe("multiplicador de blindaje", () => {
+  it("por defecto es 2, confirmado en la app oficial", () => {
+    // Pagar 10M sobre una cláusula de 30M la deja en 50M: C + 2·Δ.
+    const { clauseMultiplier } = requireShieldingRules();
+    expect(clauseMultiplier).toBe(2);
+
+    const clausulaNueva = 30_000_000 + clauseMultiplier * 10_000_000;
+    expect(clausulaNueva).toBe(50_000_000);
+  });
+
+  it("deja que una liga lo cambie", () => {
+    expect(requireShieldingRules({ clauseMultiplier: 3 }).clauseMultiplier).toBe(3);
+  });
+
+  it("rechaza un multiplicador imposible", () => {
+    expect(() => requireShieldingRules({ clauseMultiplier: -1 })).toThrow();
   });
 });
