@@ -20,6 +20,7 @@ import { initialBudget } from "./rules";
 import { optimizeLineup, type Formation, type LineupCandidate } from "./lineup";
 import { buildProjectionContext } from "./projection-context";
 import { rankAttacks, type AttackRecommendation, type ClauseTarget } from "./clause-attack";
+import { cashEffectFor } from "@/lib/domain/activity";
 import type { RivalProfile } from "./exposure";
 
 /**
@@ -58,6 +59,26 @@ export interface RivalPlayer {
   buyoutClause: number | null;
 }
 
+/**
+ * Un movimiento del rival con el saldo que le deja.
+ *
+ * Es el libro de cuentas que produce la caja estimada. Enseñar solo el
+ * resultado obliga a creérselo; enseñar el recorrido permite comprobarlo, y
+ * además deja ver el patrón de cada uno: quién compra caro, quién vende para
+ * financiarse, quién lleva días quieto.
+ */
+export interface RivalMovement {
+  id: string;
+  occurredAt: Date;
+  type: string;
+  playerName: string | null;
+  /** Lo que le suma o resta. Null cuando el feed no expone el importe. */
+  delta: number | null;
+  /** Saldo estimado justo después de este movimiento. */
+  balanceAfter: number;
+  certain: boolean;
+}
+
 export interface RivalView {
   managerId: string;
   teamName: string;
@@ -76,6 +97,8 @@ export interface RivalView {
   /** Sus jugadores que te salen a cuenta clausular, ya ordenados. */
   targets: AttackRecommendation[];
   alerts: string[];
+  /** Su histórico de compras y ventas, del más reciente al más antiguo. */
+  movements: RivalMovement[];
 }
 
 /**
@@ -374,6 +397,31 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
         options: exposureOptions,
       }).filter((a) => a.verdict === "attack");
 
+      // El libro de cuentas: se recorre en orden y se acumula, así que el
+      // saldo de cada línea es el que tenía justo después de esa operación.
+      const movements: RivalMovement[] = [];
+      let running = seed ?? initialBudget();
+      for (const event of events) {
+        const effect = cashEffectFor(event, manager.id);
+        const leTocaba =
+          event.managerId === manager.id ||
+          event.counterpartyManagerId === manager.id;
+        if (!leTocaba) continue;
+
+        running += effect.delta;
+        movements.push({
+          id: event.id,
+          occurredAt: event.occurredAt,
+          type: event.type,
+          playerName:
+            rows.find((r) => r.playerId === event.playerId)?.name ?? null,
+          delta: event.amount === null ? null : effect.delta,
+          balanceAfter: running,
+          certain: effect.certain,
+        });
+      }
+      movements.reverse();
+
       const cash = bands.get(manager.id)!;
       const squadValue = suyos.reduce((acc, r) => acc + (r.marketValue ?? 0), 0);
 
@@ -397,6 +445,7 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
           return aRivalPlayer(row);
         }),
         targets: ranked,
+        movements,
         alerts: buildAlerts({
           cash,
           myCash,
