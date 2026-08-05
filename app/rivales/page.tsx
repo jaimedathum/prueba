@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
  * responde a "¿qué hago con este?" mirando la suya, que es la pregunta que
  * uno se hace de verdad antes de gastar dinero.
  *
- * Van ordenados por caja máxima: el que más puede pagar es el que más te
- * puede quitar.
+ * Van ordenados por la caja estimada, no por el techo de su banda: un techo
+ * alto puede venir solo de que se sabe poco, y desconocimiento no es amenaza.
  */
 export default async function RivalesPage() {
   let data;
@@ -45,7 +45,7 @@ export default async function RivalesPage() {
   return (
     <Page
       title="Rivales"
-      subtitle={`${rivals.length} en tu liga, ordenados por lo que pueden llegar a pagar.`}
+      subtitle={`${rivals.length} en tu liga, ordenados por la caja que se les estima.`}
     >
       {warnings.length > 0 && (
         <Notice title="Lo que hay que tener en cuenta">
@@ -148,10 +148,10 @@ export default async function RivalesPage() {
             <Card>
               <StatGrid>
                 <Stat
-                  label="Puede pagar hasta"
-                  value={formatMoney(rival.cash.max)}
-                  hint={`al menos ${formatMoney(rival.cash.min)}`}
-                  tone={rival.cash.max > 0 ? "warn" : "muted"}
+                  label="Caja estimada"
+                  value={formatMoney(rival.cash.point)}
+                  hint={`entre ${formatMoney(rival.cash.min)} y ${formatMoney(rival.cash.max)}`}
+                  tone={rival.cash.point > 0 ? "warn" : "muted"}
                 />
                 <Stat
                   label="Valor de plantilla"

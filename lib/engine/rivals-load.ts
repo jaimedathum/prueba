@@ -15,6 +15,7 @@ import {
   type BudgetEvent,
   type CashBand,
 } from "./budget";
+import { initialBudget } from "./rules";
 import { optimizeLineup, type Formation, type LineupCandidate } from "./lineup";
 import { buildProjectionContext } from "./projection-context";
 import { rankAttacks, type AttackRecommendation, type ClauseTarget } from "./clause-attack";
@@ -151,6 +152,28 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
     me.id,
     me.reportedBalance,
   );
+
+  if (me.reportedBalance !== null) {
+    const semilla = initialBudget();
+    const desvio = Math.abs(me.reportedBalance - (bands.get(me.id)?.point ?? 0));
+    // Con el feed vacío, todo el desvío es del presupuesto inicial supuesto, y
+    // se dobla al ensanchar las bandas de los demás: el techo de un rival sale
+    // el doble de lo que debería.
+    if (events.length === 0 && Math.abs(semilla - me.reportedBalance) > 1) {
+      warnings.push(
+        `El presupuesto inicial supuesto es ${(semilla / 1_000_000).toFixed(0)}M ` +
+          `pero tu saldo real es ${(me.reportedBalance / 1_000_000).toFixed(0)}M. ` +
+          "Esa diferencia ensancha la banda de todos los rivales al doble de " +
+          "lo necesario. Configura FANTASY_INITIAL_BUDGET con el presupuesto " +
+          "de tu liga y las bandas se estrecharán de golpe.",
+      );
+    } else if (desvio > 0) {
+      warnings.push(
+        `El modelo se desvía ${(desvio / 1_000_000).toFixed(1)}M en tu saldo, ` +
+          "así que otro tanto se aplica a los rivales y ensancha sus bandas.",
+      );
+    }
+  }
 
   const sinClasificar = events.filter((e) => e.type === "unknown").length;
   if (sinClasificar > 0) {
@@ -379,8 +402,10 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
         }),
       };
     })
-    // El más peligroso primero: quien más caja tiene, más puede quitarte.
-    .sort((a, b) => b.cash.max - a.cash.max);
+    // El más peligroso primero, por la estimación y no por el techo: un techo
+    // alto puede venir solo de una banda ancha, que es desconocimiento y no
+    // amenaza.
+    .sort((a, b) => b.cash.point - a.cash.point);
 
   if (context.nextMatchday === null) {
     warnings.push(
