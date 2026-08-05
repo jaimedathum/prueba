@@ -31,9 +31,29 @@ export function getTelegramConfig(): TelegramConfig | null {
   return { botToken, chatId };
 }
 
+/**
+ * Caracteres que MarkdownV2 reserva. Telegram exige escapar **todos** los que
+ * aparezcan en el texto, incluso donde no podrían formar marcado: si se queda
+ * uno sin escapar, la API responde 400 y el mensaje entero se pierde.
+ *
+ * La lista sale de la documentación de Telegram y es cerrada, que es
+ * justamente lo que el `Markdown` legacy no ofrecía.
+ */
+const MARKDOWN_V2_RESERVED = /[_*[\]()~`>#+\-=|{}.!\\]/g;
+
+export function escapeMarkdownV2(text: string): string {
+  return text.replace(MARKDOWN_V2_RESERVED, (char) => `\\${char}`);
+}
+
 export interface SendOptions {
   fetchImpl?: typeof fetch;
   config?: TelegramConfig;
+  /**
+   * Por defecto se manda sin marcado: es lo seguro para un texto cualquiera.
+   * Quien quiera negritas manda `"MarkdownV2"` y se ocupa de escapar con
+   * `escapeMarkdownV2`.
+   */
+  parseMode?: "MarkdownV2";
 }
 
 export async function sendTelegramMessage(
@@ -52,7 +72,7 @@ export async function sendTelegramMessage(
       body: JSON.stringify({
         chat_id: config.chatId,
         text,
-        parse_mode: "Markdown",
+        ...(options.parseMode ? { parse_mode: options.parseMode } : {}),
         disable_web_page_preview: true,
       }),
     },

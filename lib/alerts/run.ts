@@ -1,10 +1,14 @@
 import { getMarketDashboard } from "@/lib/engine/market-load";
 import { getRiskDashboard } from "@/lib/engine/load";
-import { lastSyncRun } from "@/lib/ingest/sync";
+import { lastSyncRun, reconcileStaleRuns } from "@/lib/ingest/sync";
 import { buildAlerts } from "./digest";
 import { loadSentAlerts, recordSentAlerts, selectAlertsToSend } from "./dedupe";
-import { sendTelegramMessage, getTelegramConfig } from "./telegram";
-import { formatDigest, type Alert } from "./types";
+import {
+  escapeMarkdownV2,
+  getTelegramConfig,
+  sendTelegramMessage,
+} from "./telegram";
+import { formatDigest, formatDigestMarkdown, type Alert } from "./types";
 
 /**
  * Ejecución del aviso diario.
@@ -36,6 +40,11 @@ export async function runAlerts(
 ): Promise<AlertRunResult> {
   const now = options.now ?? new Date();
   const today = now.toISOString().slice(0, 10);
+
+  // Antes de mirar el estado: una sincronización cortada a mitad se queda en
+  // "running", y este job solo avisa de las que están en "failed". Sin esto,
+  // el fallo más grave —llevar días con datos viejos— era mudo.
+  await reconcileStaleRuns(now).catch(() => 0);
 
   const [risk, market, sync] = await Promise.all([
     getRiskDashboard().catch(() => null),
@@ -96,7 +105,10 @@ export async function runAlerts(
     };
   }
 
-  await sendTelegramMessage(message, { fetchImpl: options.fetchImpl });
+  await sendTelegramMessage(formatDigestMarkdown(toSend, escapeMarkdownV2), {
+    fetchImpl: options.fetchImpl,
+    parseMode: "MarkdownV2",
+  });
   // Solo se registra tras un envío correcto: si falla, se reintenta mañana
   // en vez de dar por avisado algo que nunca llegó.
   await recordSentAlerts(toSend);

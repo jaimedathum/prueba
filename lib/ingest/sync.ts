@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, notInArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   activityEvents,
@@ -167,6 +167,10 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
   let runId: number | null = null;
 
   if (db) {
+    // Antes de abrir una fila nueva, cerrar las que quedaron colgadas: si no,
+    // se acumulan y el panel enseña "En curso" indefinidamente.
+    await reconcileStaleRuns();
+
     const [run] = await db
       .insert(syncRuns)
       .values({ status: "running" })
@@ -772,6 +776,47 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     }
     throw error;
   }
+}
+
+/**
+ * Cuánto puede durar una sincronización antes de darla por muerta.
+ *
+ * `maxDuration` son 300 s, así que a los 15 minutos no queda ninguna duda: o
+ * la plataforma cortó la función, o el proceso se cayó. En ninguno de los dos
+ * casos hay nadie que vaya a cerrar esa fila.
+ */
+const STALE_RUN_MS = 15 * 60 * 1000;
+
+/**
+ * Cierra las sincronizaciones que se quedaron colgadas en "running".
+ *
+ * Cuando la plataforma corta la función a mitad, el `catch`/`finally` de
+ * `runSync` no llega a ejecutarse y la fila se queda en "running" **para
+ * siempre**. Eso no es solo cosmético: el aviso de fallo de sincronización se
+ * dispara mirando `status === "failed"` (`lib/alerts/digest.ts`), así que
+ * justo el caso más grave —llevar días sin datos frescos— era el único que no
+ * avisaba nunca.
+ *
+ * Se llama al arrancar una sincronización nueva y también antes de componer
+ * los avisos, que es donde el silencio hace daño.
+ */
+export async function reconcileStaleRuns(now = new Date()): Promise<number> {
+  const db = getDb();
+  const cutoff = new Date(now.getTime() - STALE_RUN_MS);
+
+  const closed = await db
+    .update(syncRuns)
+    .set({
+      status: "failed",
+      finishedAt: now,
+      error:
+        "Interrumpida: la ejecución no llegó a terminar (probablemente un " +
+        "timeout de la plataforma) y se ha cerrado al detectarla colgada.",
+    })
+    .where(and(eq(syncRuns.status, "running"), lt(syncRuns.startedAt, cutoff)))
+    .returning({ id: syncRuns.id });
+
+  return closed.length;
 }
 
 /** Última sincronización, para el panel de estado. */
