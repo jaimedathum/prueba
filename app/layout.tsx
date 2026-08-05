@@ -8,6 +8,15 @@ export const metadata: Metadata = {
   description: "Asistente de decisión para LaLiga Fantasy Oficial",
 };
 
+/**
+ * El `SyncButton` de la cabecera vive en el layout, así que su server action
+ * corre bajo el presupuesto de tiempo de este segmento. Una sincronización son
+ * 250-300 peticiones serializadas a 350 ms: entre dos y cinco minutos. Con el
+ * valor por defecto se cortaba a mitad, y encima dejaba la fila de `sync_runs`
+ * colgada en "running" (ver `reconcileStaleRuns`).
+ */
+export const maxDuration = 300;
+
 export const viewport: Viewport = {
   // La app se usa en el móvil mientras se mira la oficial: que no haga zoom
   // raro ni deje huecos bajo el notch.

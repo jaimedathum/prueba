@@ -11,7 +11,8 @@ import {
   getInteractiveConfig,
   loginWithPassword,
 } from "@/lib/fantasy/auth";
-import { decryptToken, encryptToken, safeEqual } from "@/lib/fantasy/crypto";
+import { checkAdminSecret, grantAdminSession } from "@/lib/admin-gate";
+import { decryptToken, encryptToken } from "@/lib/fantasy/crypto";
 
 /**
  * Login inicial desde el navegador.
@@ -68,20 +69,16 @@ const VERIFIER_COOKIE = "fa_pkce";
 /** El usuario tiene que ir a LaLiga y volver; 15 minutos sobran. */
 const VERIFIER_TTL_SECONDS = 15 * 60;
 
-function authorize(formData: FormData): LoginState | null {
-  const expected = process.env.CRON_SECRET;
-  if (!expected) {
-    return {
-      ok: false,
-      message:
-        "CRON_SECRET no está configurado en el despliegue. Añádelo en " +
-        "Vercel → Settings → Environment Variables y vuelve a desplegar.",
-    };
-  }
-  if (!safeEqual(String(formData.get("secret") ?? ""), expected)) {
-    // Mensaje genérico a propósito: no confirma si el secreto existe.
-    return { ok: false, message: "Secreto incorrecto." };
-  }
+/**
+ * Devuelve el estado de error si el secreto no vale, o `null` para seguir.
+ * Acertarlo desbloquea además el resto de acciones privilegiadas en este
+ * navegador (`lib/admin-gate.ts`).
+ */
+async function authorize(formData: FormData): Promise<LoginState | null> {
+  const gate = checkAdminSecret(String(formData.get("secret") ?? ""));
+  if (!gate.ok) return { ok: false, message: gate.message };
+
+  await grantAdminSession();
   return null;
 }
 
@@ -91,7 +88,7 @@ export async function loginAction(
   _previous: LoginState | null,
   formData: FormData,
 ): Promise<LoginState> {
-  const denied = authorize(formData);
+  const denied = await authorize(formData);
   if (denied) return denied;
 
   const email = String(formData.get("email") ?? "").trim();
@@ -125,7 +122,7 @@ export async function startInteractiveLogin(
   _previous: LoginState | null,
   formData: FormData,
 ): Promise<LoginState> {
-  const denied = authorize(formData);
+  const denied = await authorize(formData);
   if (denied) return denied;
 
   const { verifier, challenge } = createPkcePair();
@@ -157,7 +154,7 @@ export async function completeInteractiveLogin(
   _previous: LoginState | null,
   formData: FormData,
 ): Promise<LoginState> {
-  const denied = authorize(formData);
+  const denied = await authorize(formData);
   if (denied) return denied;
 
   const jar = await cookies();

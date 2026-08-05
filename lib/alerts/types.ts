@@ -67,18 +67,47 @@ export function sortByPriority(alerts: Alert[]): Alert[] {
   );
 }
 
-/** Formato del mensaje. Corto, ordenado por urgencia y directo a la acción. */
+const ICONS: Record<AlertPriority, string> = {
+  high: "🔴",
+  medium: "🟡",
+  low: "⚪",
+};
+
+/**
+ * Formato del mensaje. Corto, ordenado por urgencia y directo a la acción.
+ *
+ * **Texto plano.** Antes metía `*negritas*` aquí, y eso convertía esta función
+ * en una fuente de mensajes rotos: los títulos y los cuerpos llevan nombres de
+ * jugador y textos de error de la API, y un `_` suelto hacía que Telegram
+ * devolviera 400 y se perdiera **toda la tanda**, incluido el aviso de que la
+ * sincronización había fallado. El marcado ahora se aplica —y se escapa— en
+ * `formatDigestMarkdown`, justo antes de enviar.
+ *
+ * De paso, esta versión es la que se devuelve en `?dry-run=1`, donde el
+ * marcado solo estorbaba para leerlo.
+ */
 export function formatDigest(alerts: Alert[]): string {
-  const sorted = sortByPriority(alerts);
-  const icons: Record<AlertPriority, string> = {
-    high: "🔴",
-    medium: "🟡",
-    low: "⚪",
-  };
+  return sortByPriority(alerts)
+    .map((alert) => `${ICONS[alert.priority]} ${alert.title}\n${alert.body}`)
+    .join("\n\n");
+}
 
-  const lines = sorted.map(
-    (alert) => `${icons[alert.priority]} *${alert.title}*\n${alert.body}`,
-  );
-
-  return lines.join("\n\n");
+/**
+ * La misma composición, con el título en negrita y todo lo demás escapado
+ * para MarkdownV2.
+ *
+ * Se usa MarkdownV2 y no el `Markdown` legacy porque el legacy **no define un
+ * escapado fiable**: es imposible pasar por él un texto arbitrario con la
+ * garantía de que no lo interprete.
+ */
+export function formatDigestMarkdown(
+  alerts: Alert[],
+  escape: (text: string) => string,
+): string {
+  return sortByPriority(alerts)
+    .map(
+      (alert) =>
+        `${ICONS[alert.priority]} *${escape(alert.title)}*\n${escape(alert.body)}`,
+    )
+    .join("\n\n");
 }
