@@ -189,6 +189,34 @@ export interface EstimateOptions {
   priors?: AmountPriors;
 }
 
+/**
+ * Deduce el presupuesto inicial de la liga en vez de suponerlo.
+ *
+ * Tu saldo es el único visible. Si el feed no registra ningún movimiento
+ * tuyo, lo que tienes ahora **es** con lo que empezaste, y como todos empiezan
+ * igual, ese es el presupuesto de la liga. No es una estimación: es una
+ * deducción, y sustituye a un 200M supuesto que arrastraba su error a la
+ * banda de todos los rivales.
+ *
+ * En cuanto haya movimientos propios se devuelve null y manda el valor
+ * configurado: reconstruir el punto de partida hacia atrás a través de
+ * importes que el feed a veces no expone metería más error del que quita.
+ */
+export function inferInitialBudget(
+  events: BudgetEvent[],
+  myManagerId: string,
+  myReportedBalance: number | null,
+): number | null {
+  if (myReportedBalance === null) return null;
+
+  const meAfecta = events.some(
+    (event) =>
+      event.managerId === myManagerId ||
+      event.counterpartyManagerId === myManagerId,
+  );
+  return meAfecta ? null : myReportedBalance;
+}
+
 export function estimateCash(
   managerIds: string[],
   events: BudgetEvent[],

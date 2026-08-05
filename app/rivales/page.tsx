@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
  * responde a "¿qué hago con este?" mirando la suya, que es la pregunta que
  * uno se hace de verdad antes de gastar dinero.
  *
- * Van ordenados por caja máxima: el que más puede pagar es el que más te
- * puede quitar.
+ * Van ordenados por la caja estimada, no por el techo de su banda: un techo
+ * alto puede venir solo de que se sabe poco, y desconocimiento no es amenaza.
  */
 export default async function RivalesPage() {
   let data;
@@ -45,7 +45,7 @@ export default async function RivalesPage() {
   return (
     <Page
       title="Rivales"
-      subtitle={`${rivals.length} en tu liga, ordenados por lo que pueden llegar a pagar.`}
+      subtitle={`${rivals.length} en tu liga, ordenados por la caja que se les estima.`}
     >
       {warnings.length > 0 && (
         <Notice title="Lo que hay que tener en cuenta">
@@ -148,14 +148,15 @@ export default async function RivalesPage() {
             <Card>
               <StatGrid>
                 <Stat
-                  label="Puede pagar hasta"
-                  value={formatMoney(rival.cash.max)}
-                  hint={`al menos ${formatMoney(rival.cash.min)}`}
-                  tone={rival.cash.max > 0 ? "warn" : "muted"}
+                  label="Caja estimada"
+                  value={formatMoney(rival.cash.point)}
+                  hint={`entre ${formatMoney(rival.cash.min)} y ${formatMoney(rival.cash.max)}`}
+                  tone={rival.cash.point > 0 ? "warn" : "muted"}
                 />
                 <Stat
-                  label="Valor de plantilla"
-                  value={formatMoney(rival.squadValue)}
+                  label="Patrimonio"
+                  value={formatMoney(rival.cash.point + rival.squadValue)}
+                  hint={`${formatMoney(rival.squadValue)} en jugadores`}
                 />
                 <Stat
                   label="Su mejor once"
@@ -239,6 +240,100 @@ export default async function RivalesPage() {
               </p>
             )}
 
+            {rival.movements.length > 0 && (
+              <details>
+                <summary
+                  className="cursor-pointer text-sm"
+                  style={{ color: "var(--muted)" }}
+                >
+                  Ver sus {rival.movements.length} movimientos y cómo le
+                  quedó la caja
+                </summary>
+                <div className="table-scroll mt-2">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr
+                        className="border-b text-left text-xs uppercase"
+                        style={{
+                          borderColor: "var(--border)",
+                          color: "var(--muted)",
+                        }}
+                      >
+                        <th className="py-2 pr-3">Cuándo</th>
+                        <th className="py-2 pr-3">Qué</th>
+                        <th className="py-2 pr-3 text-right">Importe</th>
+                        <th className="py-2 text-right">Le queda</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rival.movements.map((m) => (
+                        <tr
+                          key={m.id}
+                          className="border-b"
+                          style={{ borderColor: "var(--border)" }}
+                        >
+                          <td
+                            className="py-2 pr-3 text-xs"
+                            style={{ color: "var(--muted)" }}
+                          >
+                            {m.occurredAt.toLocaleDateString("es-ES", {
+                              day: "2-digit",
+                              month: "short",
+                            })}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {m.playerName ?? tipoLegible(m.type)}
+                            {m.playerName && (
+                              <span
+                                className="block text-xs"
+                                style={{ color: "var(--muted)" }}
+                              >
+                                {tipoLegible(m.type)}
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            className="nums py-2 pr-3 text-right"
+                            style={{
+                              color:
+                                m.delta === null
+                                  ? "var(--muted)"
+                                  : m.delta < 0
+                                    ? "var(--bad)"
+                                    : "var(--good)",
+                            }}
+                          >
+                            {m.delta === null
+                              ? "sin importe"
+                              : `${m.delta > 0 ? "+" : ""}${formatMoney(m.delta)}`}
+                          </td>
+                          <td className="nums py-2 text-right">
+                            {formatMoney(m.balanceAfter)}
+                            {!m.certain && (
+                              <span
+                                className="ml-1 text-xs"
+                                style={{ color: "var(--muted)" }}
+                                title="El feed no expone el importe: desde aquí la banda se ensancha."
+                              >
+                                ?
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
+                  Este es el libro de cuentas del que sale su caja estimada.
+                  Empieza en el presupuesto inicial y se le aplica cada
+                  operación. Una fila con <strong>?</strong> es un movimiento
+                  cuyo importe el feed no expone: a partir de ahí la banda se
+                  ensancha en vez de inventarse la cifra.
+                </p>
+              </details>
+            )}
+
             <details>
               <summary
                 className="cursor-pointer text-sm"
@@ -289,5 +384,20 @@ export default async function RivalesPage() {
         </p>
       </footer>
     </Page>
+  );
+}
+
+/** Los tipos internos del feed, en castellano. */
+function tipoLegible(type: string): string {
+  return (
+    {
+      market_purchase: "compra en el mercado",
+      market_sale: "venta al mercado",
+      clause_paid: "clausulazo pagado",
+      clause_received: "clausulazo recibido",
+      transfer_in: "fichaje",
+      transfer_out: "traspaso",
+      unknown: "movimiento sin clasificar",
+    }[type] ?? type
   );
 }

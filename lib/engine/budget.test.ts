@@ -1,3 +1,4 @@
+import { inferInitialBudget } from "./budget";
 import { requireShieldingRules } from "./rules";
 import { describe, expect, it } from "vitest";
 import {
@@ -318,5 +319,49 @@ describe("multiplicador de blindaje", () => {
 
   it("rechaza un multiplicador imposible", () => {
     expect(() => requireShieldingRules({ clauseMultiplier: -1 })).toThrow();
+  });
+});
+
+describe("inferInitialBudget", () => {
+  it("deduce el presupuesto del saldo propio cuando nadie ha movido nada", () => {
+    // El caso de una liga recién empezada: lo que tienes es con lo que
+    // empezaste, y como todos empiezan igual, ese es el presupuesto.
+    expect(inferInitialBudget([], "T1", 100_000_000)).toBe(100_000_000);
+  });
+
+  it("no deduce nada sin saldo propio visible", () => {
+    expect(inferInitialBudget([], "T1", null)).toBeNull();
+  });
+
+  it("se abstiene en cuanto hay un movimiento propio", () => {
+    // Reconstruir el punto de partida hacia atrás a través de importes que el
+    // feed a veces no expone metería más error del que quita.
+    const evento = {
+      id: "e1",
+      occurredAt: new Date(),
+      type: "buy" as const,
+      managerId: "T1",
+      counterpartyManagerId: null,
+      playerId: "P1",
+      amount: 5_000_000,
+      amountCertain: true,
+      marketValueAtTime: null,
+    };
+    expect(inferInitialBudget([evento], "T1", 95_000_000)).toBeNull();
+  });
+
+  it("ignora los movimientos de otros: no tocan tu saldo", () => {
+    const ajeno = {
+      id: "e1",
+      occurredAt: new Date(),
+      type: "buy" as const,
+      managerId: "T2",
+      counterpartyManagerId: null,
+      playerId: "P1",
+      amount: 5_000_000,
+      amountCertain: true,
+      marketValueAtTime: null,
+    };
+    expect(inferInitialBudget([ajeno], "T1", 100_000_000)).toBe(100_000_000);
   });
 });

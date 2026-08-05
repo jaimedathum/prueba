@@ -11,13 +11,16 @@ import {
   calibrate,
   estimateAmountPriors,
   estimateCash,
+  inferInitialBudget,
   type AmountPriors,
   type BudgetEvent,
   type CashBand,
 } from "./budget";
+import { initialBudget } from "./rules";
 import { optimizeLineup, type Formation, type LineupCandidate } from "./lineup";
 import { buildProjectionContext } from "./projection-context";
 import { rankAttacks, type AttackRecommendation, type ClauseTarget } from "./clause-attack";
+import { cashEffectFor } from "@/lib/domain/activity";
 import type { RivalProfile } from "./exposure";
 
 /**
@@ -56,6 +59,26 @@ export interface RivalPlayer {
   buyoutClause: number | null;
 }
 
+/**
+ * Un movimiento del rival con el saldo que le deja.
+ *
+ * Es el libro de cuentas que produce la caja estimada. Enseñar solo el
+ * resultado obliga a creérselo; enseñar el recorrido permite comprobarlo, y
+ * además deja ver el patrón de cada uno: quién compra caro, quién vende para
+ * financiarse, quién lleva días quieto.
+ */
+export interface RivalMovement {
+  id: string;
+  occurredAt: Date;
+  type: string;
+  playerName: string | null;
+  /** Lo que le suma o resta. Null cuando el feed no expone el importe. */
+  delta: number | null;
+  /** Saldo estimado justo después de este movimiento. */
+  balanceAfter: number;
+  certain: boolean;
+}
+
 export interface RivalView {
   managerId: string;
   teamName: string;
@@ -74,6 +97,8 @@ export interface RivalView {
   /** Sus jugadores que te salen a cuenta clausular, ya ordenados. */
   targets: AttackRecommendation[];
   alerts: string[];
+  /** Su histórico de compras y ventas, del más reciente al más antiguo. */
+  movements: RivalMovement[];
 }
 
 /**
@@ -142,15 +167,41 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
   }));
 
   const priors = estimateAmountPriors(events);
+  // Con el saldo propio y sin movimientos propios, el presupuesto inicial se
+  // deduce en vez de suponerse, y las bandas de todos dejan de arrastrar el
+  // error de una semilla equivocada.
+  const seed = inferInitialBudget(events, me.id, me.reportedBalance);
   const { bands } = calibrate(
     estimateCash(
       allManagers.map((m) => m.id),
       events,
-      { priors },
+      { priors, initialBudget: seed ?? undefined },
     ),
     me.id,
     me.reportedBalance,
   );
+
+  if (me.reportedBalance !== null) {
+    const semilla = initialBudget();
+    const desvio = Math.abs(me.reportedBalance - (bands.get(me.id)?.point ?? 0));
+    // Con el feed vacío, todo el desvío es del presupuesto inicial supuesto, y
+    // se dobla al ensanchar las bandas de los demás: el techo de un rival sale
+    // el doble de lo que debería.
+    if (events.length === 0 && Math.abs(semilla - me.reportedBalance) > 1) {
+      warnings.push(
+        `El presupuesto inicial supuesto es ${(semilla / 1_000_000).toFixed(0)}M ` +
+          `pero tu saldo real es ${(me.reportedBalance / 1_000_000).toFixed(0)}M. ` +
+          "Esa diferencia ensancha la banda de todos los rivales al doble de " +
+          "lo necesario. Configura FANTASY_INITIAL_BUDGET con el presupuesto " +
+          "de tu liga y las bandas se estrecharán de golpe.",
+      );
+    } else if (desvio > 0) {
+      warnings.push(
+        `El modelo se desvía ${(desvio / 1_000_000).toFixed(1)}M en tu saldo, ` +
+          "así que otro tanto se aplica a los rivales y ensancha sus bandas.",
+      );
+    }
+  }
 
   const sinClasificar = events.filter((e) => e.type === "unknown").length;
   if (sinClasificar > 0) {
@@ -346,6 +397,31 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
         options: exposureOptions,
       }).filter((a) => a.verdict === "attack");
 
+      // El libro de cuentas: se recorre en orden y se acumula, así que el
+      // saldo de cada línea es el que tenía justo después de esa operación.
+      const movements: RivalMovement[] = [];
+      let running = seed ?? initialBudget();
+      for (const event of events) {
+        const effect = cashEffectFor(event, manager.id);
+        const leTocaba =
+          event.managerId === manager.id ||
+          event.counterpartyManagerId === manager.id;
+        if (!leTocaba) continue;
+
+        running += effect.delta;
+        movements.push({
+          id: event.id,
+          occurredAt: event.occurredAt,
+          type: event.type,
+          playerName:
+            rows.find((r) => r.playerId === event.playerId)?.name ?? null,
+          delta: event.amount === null ? null : effect.delta,
+          balanceAfter: running,
+          certain: effect.certain,
+        });
+      }
+      movements.reverse();
+
       const cash = bands.get(manager.id)!;
       const squadValue = suyos.reduce((acc, r) => acc + (r.marketValue ?? 0), 0);
 
@@ -369,6 +445,7 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
           return aRivalPlayer(row);
         }),
         targets: ranked,
+        movements,
         alerts: buildAlerts({
           cash,
           myCash,
@@ -379,8 +456,10 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
         }),
       };
     })
-    // El más peligroso primero: quien más caja tiene, más puede quitarte.
-    .sort((a, b) => b.cash.max - a.cash.max);
+    // El más peligroso primero, por la estimación y no por el techo: un techo
+    // alto puede venir solo de una banda ancha, que es desconocimiento y no
+    // amenaza.
+    .sort((a, b) => b.cash.point - a.cash.point);
 
   if (context.nextMatchday === null) {
     warnings.push(
