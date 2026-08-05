@@ -11,6 +11,7 @@ import {
   calibrate,
   estimateAmountPriors,
   estimateCash,
+  inferInitialBudget,
   type AmountPriors,
   type BudgetEvent,
   type CashBand,
@@ -143,11 +144,15 @@ export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
   }));
 
   const priors = estimateAmountPriors(events);
+  // Con el saldo propio y sin movimientos propios, el presupuesto inicial se
+  // deduce en vez de suponerse, y las bandas de todos dejan de arrastrar el
+  // error de una semilla equivocada.
+  const seed = inferInitialBudget(events, me.id, me.reportedBalance);
   const { bands } = calibrate(
     estimateCash(
       allManagers.map((m) => m.id),
       events,
-      { priors },
+      { priors, initialBudget: seed ?? undefined },
     ),
     me.id,
     me.reportedBalance,

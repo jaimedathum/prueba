@@ -154,8 +154,9 @@ export default async function RivalesPage() {
                   tone={rival.cash.point > 0 ? "warn" : "muted"}
                 />
                 <Stat
-                  label="Valor de plantilla"
-                  value={formatMoney(rival.squadValue)}
+                  label="Patrimonio"
+                  value={formatMoney(rival.cash.point + rival.squadValue)}
+                  hint={`${formatMoney(rival.squadValue)} en jugadores`}
                 />
                 <Stat
                   label="Su mejor once"
