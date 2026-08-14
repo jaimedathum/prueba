@@ -115,8 +115,24 @@ Hacerlo contra un Postgres local deja a Vercel sin token, y el cron falla con
 *"No hay refresh token guardado"*.
 
 Ojo: ROPC solo funciona con cuentas locales de email y contraseña. Si la cuenta
-del juego es de Google, Apple o Facebook, esto falla por diseño y hace falta el
-flujo interactivo, todavía sin implementar. Ver [`reglas.md`](reglas.md).
+del juego es de Google, Apple o Facebook, esto falla por diseño y hay que usar
+el **flujo interactivo**, que está implementado y es la segunda opción de esa
+misma página. Ver [`reglas.md`](reglas.md).
+
+### 4 bis. El desbloqueo del navegador
+
+Acertar el secreto en `/setup` o en `/setup/login` deja además una cookie
+firmada que **desbloquea este navegador durante 30 días**. Es lo que permite
+que el botón «Sincronizar» de la cabecera funcione de un clic sin pedir la
+contraseña cada vez, y que la página de correcciones manuales deje de estar
+abierta a cualquiera que conozca la URL.
+
+Dos consecuencias prácticas:
+
+- Desde un navegador sin desbloquear, el botón de sincronizar y `/overrides`
+  responden que hace falta pasar por `/setup`. Los paneles se siguen viendo.
+- **Cambiar `CRON_SECRET` invalida todas las sesiones de golpe**, que es lo que
+  hay que hacer si alguna vez se sospecha que el secreto se ha filtrado.
 
 ### 5. Crons
 

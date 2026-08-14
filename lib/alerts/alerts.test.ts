@@ -7,11 +7,16 @@ import { buildAlerts, type DigestInput } from "./digest";
 import { selectAlertsToSend } from "./dedupe";
 import {
   formatDigest,
+  formatDigestMarkdown,
   meetsThreshold,
   sortByPriority,
   type Alert,
 } from "./types";
-import { sendTelegramMessage, TelegramNotConfiguredError } from "./telegram";
+import {
+  escapeMarkdownV2,
+  sendTelegramMessage,
+  TelegramNotConfiguredError,
+} from "./telegram";
 
 function shield(overrides: Partial<ShieldRecommendation> = {}): ShieldRecommendation {
   return {
@@ -278,6 +283,84 @@ describe("formatDigest", () => {
       },
     ]);
     expect(texto).toContain("🔴");
+  });
+});
+
+describe("formatDigestMarkdown", () => {
+  /**
+   * El fallo que justifica todo esto: un nombre con guion bajo hacía que
+   * Telegram devolviera 400 y se perdiera la tanda entera, incluido el aviso
+   * de que la sincronización había fallado.
+   */
+  it("escapa los caracteres reservados del contenido", () => {
+    const texto = formatDigestMarkdown(
+      [
+        {
+          key: "a",
+          kind: "clause-risk",
+          priority: "high",
+          title: "Riesgo de perder a Fede_Valverde",
+          body: "Vale 12.5M (un 30% más).",
+        },
+      ],
+      escapeMarkdownV2,
+    );
+
+    expect(texto).toContain("Fede\\_Valverde");
+    expect(texto).toContain("12\\.5M");
+    expect(texto).toContain("\\(un 30% más\\)");
+  });
+
+  it("deja en pie el marcado que sí es nuestro", () => {
+    const texto = formatDigestMarkdown(
+      [{ key: "a", kind: "bid", priority: "high", title: "Puja", body: "b" }],
+      escapeMarkdownV2,
+    );
+
+    expect(texto).toContain("*Puja*");
+    expect(texto).toContain("🔴");
+  });
+
+  it("sigue ordenando por urgencia", () => {
+    const texto = formatDigestMarkdown(
+      [
+        { key: "a", kind: "bid", priority: "medium", title: "Media", body: "b" },
+        { key: "b", kind: "clause-risk", priority: "high", title: "Urgente", body: "b" },
+      ],
+      escapeMarkdownV2,
+    );
+
+    expect(texto.indexOf("Urgente")).toBeLessThan(texto.indexOf("Media"));
+  });
+});
+
+describe("escapeMarkdownV2", () => {
+  it("escapa toda la lista reservada de Telegram", () => {
+    expect(escapeMarkdownV2("_*[]()~`>#+-=|{}.!")).toBe(
+      "\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\-\\=\\|\\{\\}\\.\\!",
+    );
+  });
+
+  it("escapa también la propia barra invertida", () => {
+    expect(escapeMarkdownV2("a\\b")).toBe("a\\\\b");
+  });
+
+  it("no toca el texto corriente ni los acentos", () => {
+    expect(escapeMarkdownV2("Ganó el Atlético 2 a 0")).toBe(
+      "Ganó el Atlético 2 a 0",
+    );
+  });
+});
+
+describe("formatDigest", () => {
+  /** La versión de texto plano no puede volver a meter marcado. */
+  it("no emite marcado", () => {
+    const texto = formatDigest([
+      { key: "a", kind: "bid", priority: "high", title: "Puja", body: "b" },
+    ]);
+
+    expect(texto).not.toContain("*");
+    expect(texto).toContain("Puja");
   });
 });
 

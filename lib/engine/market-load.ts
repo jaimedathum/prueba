@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   activityEvents,
@@ -9,6 +9,7 @@ import {
   rosterEntries,
 } from "@/lib/db/schema";
 import { bidMultiplier } from "@/lib/domain/activity";
+import { partitionOpenListings } from "@/lib/domain/market";
 import { riskLevel, type RiskLevel } from "@/lib/domain/risk";
 import { FALLBACK_FORMATIONS, type PositionCode } from "@/lib/domain/positions";
 import {
@@ -91,7 +92,9 @@ export interface MarketDashboard {
   warnings: string[];
 }
 
-export async function getMarketDashboard(): Promise<MarketDashboard | null> {
+export async function getMarketDashboard(
+  now = new Date(),
+): Promise<MarketDashboard | null> {
   const db = getDb();
   const warnings: string[] = [];
 
@@ -203,7 +206,16 @@ export async function getMarketDashboard(): Promise<MarketDashboard | null> {
     .innerJoin(players, eq(players.id, rosterEntries.playerId))
     .where(eq(rosterEntries.leagueId, leagueId));
 
-  const listings = await db
+  /**
+   * Solo lo que se puede comprar **ahora**.
+   *
+   * `market_listings` guarda historia, así que sin filtrar esto devolvía a
+   * todo el que hubiera pasado por el mercado desde la primera sincronización.
+   * El `removedAt IS NULL` va en SQL porque hay un índice para él; la
+   * caducidad se comprueba después, porque depende de la hora a la que se mire
+   * y no de lo que había cuando se sincronizó.
+   */
+  const storedListings = await db
     .select({
       listingId: marketListings.id,
       playerId: players.id,
@@ -213,10 +225,30 @@ export async function getMarketDashboard(): Promise<MarketDashboard | null> {
       realTeamId: players.realTeamId,
       totalPoints: players.totalPoints,
       marketValue: marketListings.marketValue,
+      removedAt: marketListings.removedAt,
+      expiresAt: marketListings.expiresAt,
     })
     .from(marketListings)
     .innerJoin(players, eq(players.id, marketListings.playerId))
-    .where(eq(marketListings.leagueId, leagueId));
+    .where(
+      and(
+        eq(marketListings.leagueId, leagueId),
+        isNull(marketListings.removedAt),
+      ),
+    );
+
+  const { open: listings, closed: expiredListings } = partitionOpenListings(
+    storedListings,
+    now,
+  );
+
+  if (listings.length === 0 && expiredListings.length > 0) {
+    warnings.push(
+      `Las ${expiredListings.length} ofertas que había han caducado desde la ` +
+        "última sincronización. Sincroniza para ver el mercado nuevo: hasta " +
+        "entonces no hay nada por lo que pujar.",
+    );
+  }
 
   const seeds: PlayerSeed[] = [
     ...rosterRows.map(toSeed),

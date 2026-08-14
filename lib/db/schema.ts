@@ -204,10 +204,25 @@ export const marketListings = pgTable(
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /**
+     * Cuándo dejó de estar en el mercado. `null` = sigue en venta.
+     *
+     * Sin esto la tabla solo crecía: nada marcaba la salida de un jugador, así
+     * que una fila puesta en agosto seguía contando como comprable en mayo. Y
+     * no era solo cosmético — el mercado alimenta el precio sombra del dinero,
+     * que a su vez entra en la puja óptima y en la especulación de **todos**
+     * los candidatos.
+     *
+     * Se marca en vez de borrar porque cuánto tarda un jugador en venderse es
+     * justo la clase de dato que no se puede reconstruir hacia atrás.
+     */
+    removedAt: timestamp("removed_at", { withTimezone: true }),
   },
   (t) => [
     index("market_listings_league_idx").on(t.leagueId, t.lastSeenAt),
     index("market_listings_player_idx").on(t.playerId),
+    /** Lo que pregunta el panel: lo que sigue en venta en esta liga. */
+    index("market_listings_open_idx").on(t.leagueId, t.removedAt),
   ],
 );
 

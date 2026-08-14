@@ -2,6 +2,7 @@
 
 import { desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { requireAdminSession } from "@/lib/admin-gate";
 import { getDb } from "@/lib/db";
 import { syncRuns } from "@/lib/db/schema";
 import { runSync } from "@/lib/ingest/sync";
@@ -9,15 +10,19 @@ import { runSync } from "@/lib/ingest/sync";
 /**
  * Sincronización de un clic, desde la barra de navegación.
  *
- * A diferencia de la de `/setup`, **no pide el secreto**: es la que se usa a
- * diario, después de pujar o de mover la alineación en la app oficial, y
- * pedir una contraseña cada vez la haría inservible.
+ * Es la que se usa a diario, después de pujar o de mover la alineación en la
+ * app oficial, así que **no puede pedir el secreto en cada pulsación**: eso la
+ * haría inservible. Pero tampoco puede quedarse abierta, que es como estaba:
+ * la app vive en una URL pública y sin puerta bastaba con que alguien —o un
+ * rastreador— pulsara en bucle para lanzar ráfagas de peticiones a LaLiga
+ * **con tu token**, y acabar limitado o marcado.
  *
- * A cambio lleva un **enfriamiento**. La app está en una URL pública, así que
- * sin él bastaría con que alguien —o un rastreador— pulsara en bucle para
- * lanzar ráfagas de peticiones a LaLiga con tu token, y acabar limitado o
- * marcado. Dos minutos son invisibles para quien la usa de verdad y cortan en
- * seco ese caso.
+ * La salida a esa disyuntiva es la sesión de administración: el secreto se
+ * teclea una vez en `/setup` y este navegador queda desbloqueado. Ver
+ * `lib/admin-gate.ts`.
+ *
+ * El enfriamiento se queda igualmente: protege del doble clic y de tener dos
+ * pestañas abiertas, que no son ataques pero gastan peticiones igual.
  *
  * Sigue siendo solo lectura contra el juego: la allowlist de
  * `lib/fantasy/endpoints.ts` no se toca, así que esto no puede pujar,
@@ -32,6 +37,9 @@ export interface QuickSyncState {
 }
 
 export async function quickSyncAction(): Promise<QuickSyncState> {
+  const gate = await requireAdminSession();
+  if (!gate.ok) return { ok: false, message: gate.message };
+
   const db = getDb();
 
   const [last] = await db

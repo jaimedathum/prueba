@@ -1,6 +1,6 @@
 "use server";
 
-import { safeEqual } from "@/lib/fantasy/crypto";
+import { checkAdminSecret, grantAdminSession } from "@/lib/admin-gate";
 import { diagnoseApi, type ProbeResult } from "@/lib/fantasy/probe";
 import { runSync } from "@/lib/ingest/sync";
 
@@ -14,6 +14,9 @@ import { runSync } from "@/lib/ingest/sync";
  * docs/reglas.md.
  *
  * Va protegida por `CRON_SECRET`, igual que la ruta de cron a la que sustituye.
+ * Acertarlo aquí **desbloquea también el resto de acciones privilegiadas** en
+ * este navegador (ver `lib/admin-gate.ts`), que es lo que permite que el botón
+ * de la cabecera no tenga que pedir el secreto en cada pulsación.
  */
 
 export interface SyncState {
@@ -39,13 +42,9 @@ export async function diagnoseAction(
   _previous: DiagnosisState | null,
   formData: FormData,
 ): Promise<DiagnosisState> {
-  const expected = process.env.CRON_SECRET;
-  if (!expected) {
-    return { ok: false, message: "CRON_SECRET no está configurado." };
-  }
-  if (!safeEqual(String(formData.get("secret") ?? ""), expected)) {
-    return { ok: false, message: "Secreto incorrecto." };
-  }
+  const gate = checkAdminSecret(String(formData.get("secret") ?? ""));
+  if (!gate.ok) return { ok: false, message: gate.message };
+  await grantAdminSession();
 
   try {
     const diagnosis = await diagnoseApi();
@@ -75,18 +74,9 @@ export async function runSyncAction(
   _previous: SyncState | null,
   formData: FormData,
 ): Promise<SyncState> {
-  const expected = process.env.CRON_SECRET;
-  if (!expected) {
-    return {
-      ok: false,
-      message:
-        "CRON_SECRET no está configurado en el despliegue. Añádelo en " +
-        "Vercel → Settings → Environment Variables y vuelve a desplegar.",
-    };
-  }
-  if (!safeEqual(String(formData.get("secret") ?? ""), expected)) {
-    return { ok: false, message: "Secreto incorrecto." };
-  }
+  const gate = checkAdminSecret(String(formData.get("secret") ?? ""));
+  if (!gate.ok) return { ok: false, message: gate.message };
+  await grantAdminSession();
 
   const dryRun = formData.get("dryRun") === "on";
   const shape = formData.get("shape") === "on";

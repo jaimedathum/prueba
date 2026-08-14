@@ -1,0 +1,2 @@
+ALTER TABLE "market_listings" ADD COLUMN "removed_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "market_listings_open_idx" ON "market_listings" USING btree ("league_id","removed_at");

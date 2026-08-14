@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { desc, eq } from "drizzle-orm";
+import { LOCKED_MESSAGE, hasAdminSession, requireAdminSession } from "@/lib/admin-gate";
 import { getDb } from "@/lib/db";
 import { manualOverrides } from "@/lib/db/schema";
 import { clearOverride, setOverride } from "@/lib/overrides";
@@ -14,6 +15,11 @@ export const dynamic = "force-dynamic";
  * mano lo que la sincronización no consiga leer cuando cambie la API no
  * oficial. Las correcciones se aplican al leer, así que sobreviven a
  * cualquier resincronización.
+ *
+ * Y justo eso —que sobrevivan— es lo que obliga a cerrar esta página con
+ * llave: un valor metido aquí se aplica encima de todo lo sincronizado y no
+ * hay resincronización que lo borre. Sin puerta, era escritura arbitraria y
+ * permanente en la base de datos desde una URL pública.
  */
 
 const ENTITIES = [
@@ -24,8 +30,25 @@ const ENTITIES = [
   "activity_event",
 ] as const;
 
+type Entity = (typeof ENTITIES)[number];
+
+function isEntity(value: string): value is Entity {
+  return (ENTITIES as readonly string[]).includes(value);
+}
+
+/**
+ * Un override apunta a un campo de una fila concreta, así que el id y el campo
+ * son cortos por naturaleza. El tope está para que un formulario manipulado no
+ * pueda usar esta tabla como almacén.
+ */
+const MAX_FIELD_LENGTH = 120;
+const MAX_VALUE_LENGTH = 2_000;
+const MAX_REASON_LENGTH = 500;
+
 async function saveOverride(formData: FormData): Promise<void> {
   "use server";
+
+  if (!(await requireAdminSession()).ok) return;
 
   const entity = String(formData.get("entity") ?? "");
   const entityId = String(formData.get("entityId") ?? "").trim();
@@ -33,7 +56,18 @@ async function saveOverride(formData: FormData): Promise<void> {
   const rawValue = String(formData.get("value") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
 
-  if (!entity || !entityId || !field || rawValue === "") return;
+  // El desplegable solo ofrece estas cinco, pero el formulario se puede
+  // falsificar: una entidad inventada crearía overrides que no lee nadie.
+  if (!isEntity(entity)) return;
+  if (!entityId || !field || rawValue === "") return;
+  if (
+    entityId.length > MAX_FIELD_LENGTH ||
+    field.length > MAX_FIELD_LENGTH ||
+    rawValue.length > MAX_VALUE_LENGTH ||
+    reason.length > MAX_REASON_LENGTH
+  ) {
+    return;
+  }
 
   // Se acepta JSON para poder corregir números, booleanos y textos; si no
   // parsea, se guarda como cadena, que es lo que casi siempre se quiere.
@@ -58,6 +92,8 @@ async function saveOverride(formData: FormData): Promise<void> {
 async function removeOverride(formData: FormData): Promise<void> {
   "use server";
 
+  if (!(await requireAdminSession()).ok) return;
+
   await clearOverride(
     String(formData.get("entity") ?? ""),
     String(formData.get("entityId") ?? ""),
@@ -68,6 +104,8 @@ async function removeOverride(formData: FormData): Promise<void> {
 }
 
 export default async function OverridesPage() {
+  const unlocked = await hasAdminSession();
+
   let active;
   try {
     const db = getDb();
@@ -94,6 +132,17 @@ export default async function OverridesPage() {
         </p>
       </header>
 
+      {!unlocked && (
+        <p
+          className="rounded border px-3 py-2 text-sm"
+          style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+        >
+          {LOCKED_MESSAGE} Mientras tanto, las correcciones activas se pueden
+          consultar pero no cambiar.
+        </p>
+      )}
+
+      {unlocked && (
       <form action={saveOverride} className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           Entidad
@@ -156,6 +205,7 @@ export default async function OverridesPage() {
           </button>
         </div>
       </form>
+      )}
 
       <section>
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
@@ -184,21 +234,23 @@ export default async function OverridesPage() {
                   ) : null}
                 </div>
 
-                <form action={removeOverride}>
-                  <input type="hidden" name="entity" value={override.entity} />
-                  <input
-                    type="hidden"
-                    name="entityId"
-                    value={override.entityId}
-                  />
-                  <input type="hidden" name="field" value={override.field} />
-                  <button
-                    type="submit"
-                    className="text-xs text-red-600 underline dark:text-red-400"
-                  >
-                    quitar
-                  </button>
-                </form>
+                {unlocked && (
+                  <form action={removeOverride}>
+                    <input type="hidden" name="entity" value={override.entity} />
+                    <input
+                      type="hidden"
+                      name="entityId"
+                      value={override.entityId}
+                    />
+                    <input type="hidden" name="field" value={override.field} />
+                    <button
+                      type="submit"
+                      className="text-xs text-red-600 underline dark:text-red-400"
+                    >
+                      quitar
+                    </button>
+                  </form>
+                )}
               </li>
             ))}
           </ul>

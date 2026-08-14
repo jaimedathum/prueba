@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, notInArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   activityEvents,
@@ -167,6 +167,10 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
   let runId: number | null = null;
 
   if (db) {
+    // Antes de abrir una fila nueva, cerrar las que quedaron colgadas: si no,
+    // se acumulan y el panel enseña "En curso" indefinidamente.
+    await reconcileStaleRuns();
+
     const [run] = await db
       .insert(syncRuns)
       .values({ status: "running" })
@@ -486,9 +490,54 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
               askingPrice: sql`excluded.asking_price`,
               expiresAt: sql`excluded.expires_at`,
               lastSeenAt: new Date(),
+              // Si un marketId vuelve a aparecer, vuelve a estar en venta.
+              removedAt: null,
             },
           });
       }
+
+      /**
+       * Y lo que ya no está, se cierra.
+       *
+       * Esta es la mitad que faltaba: sin ella la tabla solo crecía y el panel
+       * de mercado acababa recomendando pujas por jugadores vendidos hacía
+       * meses. El equivalente para plantillas ya existía unas líneas más
+       * arriba (el `notInArray` de `roster_entries`); el mercado se había
+       * quedado sin él.
+       *
+       * Se marca `removedAt` en vez de borrar: cuánto tarda en venderse un
+       * jugador no se puede reconstruir después.
+       */
+      const currentIds = listings.map((l) => l.id);
+      const closed = await db
+        .update(marketListings)
+        .set({ removedAt: new Date() })
+        .where(
+          and(
+            eq(marketListings.leagueId, leagueId),
+            isNull(marketListings.removedAt),
+            notInArray(marketListings.id, currentIds),
+          ),
+        )
+        .returning({ id: marketListings.id });
+
+      stats.marketListingsClosed = closed.length;
+      if (closed.length > 0) log(`Mercado: ${closed.length} ya no están`);
+    } else if (db && listings.length === 0) {
+      /**
+       * Cero jugadores se trata como caída, no como "hoy no hay mercado".
+       *
+       * Es la misma doctrina que con las fuentes de onces: una respuesta 200
+       * con la lista vacía casi siempre significa que el parser dejó de
+       * encontrar los campos, no que el mercado esté desierto. Cerrar todo a
+       * ciegas con esa señal vaciaría el panel entero por un cambio de la API.
+       */
+      warnings.push(
+        "El mercado ha devuelto cero jugadores. No se ha cerrado ninguna " +
+          "oferta por si acaso: un mercado vacío casi siempre es un parser " +
+          "roto, no un mercado sin nadie. Si se repite, revisa " +
+          "parseMarketListing con `npm run sync -- --dry-run --shape`.",
+      );
     }
 
     /* --- 6. Feed de actividad -------------------------------------- */
@@ -772,6 +821,47 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     }
     throw error;
   }
+}
+
+/**
+ * Cuánto puede durar una sincronización antes de darla por muerta.
+ *
+ * `maxDuration` son 300 s, así que a los 15 minutos no queda ninguna duda: o
+ * la plataforma cortó la función, o el proceso se cayó. En ninguno de los dos
+ * casos hay nadie que vaya a cerrar esa fila.
+ */
+const STALE_RUN_MS = 15 * 60 * 1000;
+
+/**
+ * Cierra las sincronizaciones que se quedaron colgadas en "running".
+ *
+ * Cuando la plataforma corta la función a mitad, el `catch`/`finally` de
+ * `runSync` no llega a ejecutarse y la fila se queda en "running" **para
+ * siempre**. Eso no es solo cosmético: el aviso de fallo de sincronización se
+ * dispara mirando `status === "failed"` (`lib/alerts/digest.ts`), así que
+ * justo el caso más grave —llevar días sin datos frescos— era el único que no
+ * avisaba nunca.
+ *
+ * Se llama al arrancar una sincronización nueva y también antes de componer
+ * los avisos, que es donde el silencio hace daño.
+ */
+export async function reconcileStaleRuns(now = new Date()): Promise<number> {
+  const db = getDb();
+  const cutoff = new Date(now.getTime() - STALE_RUN_MS);
+
+  const closed = await db
+    .update(syncRuns)
+    .set({
+      status: "failed",
+      finishedAt: now,
+      error:
+        "Interrumpida: la ejecución no llegó a terminar (probablemente un " +
+        "timeout de la plataforma) y se ha cerrado al detectarla colgada.",
+    })
+    .where(and(eq(syncRuns.status, "running"), lt(syncRuns.startedAt, cutoff)))
+    .returning({ id: syncRuns.id });
+
+  return closed.length;
 }
 
 /** Última sincronización, para el panel de estado. */
