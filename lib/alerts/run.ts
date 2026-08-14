@@ -48,7 +48,7 @@ export async function runAlerts(
 
   const [risk, market, sync] = await Promise.all([
     getRiskDashboard().catch(() => null),
-    getMarketDashboard().catch(() => null),
+    getMarketDashboard(now).catch(() => null),
     lastSyncRun().catch(() => null),
   ]);
 

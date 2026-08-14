@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, notInArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, notInArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   activityEvents,
@@ -490,9 +490,54 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
               askingPrice: sql`excluded.asking_price`,
               expiresAt: sql`excluded.expires_at`,
               lastSeenAt: new Date(),
+              // Si un marketId vuelve a aparecer, vuelve a estar en venta.
+              removedAt: null,
             },
           });
       }
+
+      /**
+       * Y lo que ya no está, se cierra.
+       *
+       * Esta es la mitad que faltaba: sin ella la tabla solo crecía y el panel
+       * de mercado acababa recomendando pujas por jugadores vendidos hacía
+       * meses. El equivalente para plantillas ya existía unas líneas más
+       * arriba (el `notInArray` de `roster_entries`); el mercado se había
+       * quedado sin él.
+       *
+       * Se marca `removedAt` en vez de borrar: cuánto tarda en venderse un
+       * jugador no se puede reconstruir después.
+       */
+      const currentIds = listings.map((l) => l.id);
+      const closed = await db
+        .update(marketListings)
+        .set({ removedAt: new Date() })
+        .where(
+          and(
+            eq(marketListings.leagueId, leagueId),
+            isNull(marketListings.removedAt),
+            notInArray(marketListings.id, currentIds),
+          ),
+        )
+        .returning({ id: marketListings.id });
+
+      stats.marketListingsClosed = closed.length;
+      if (closed.length > 0) log(`Mercado: ${closed.length} ya no están`);
+    } else if (db && listings.length === 0) {
+      /**
+       * Cero jugadores se trata como caída, no como "hoy no hay mercado".
+       *
+       * Es la misma doctrina que con las fuentes de onces: una respuesta 200
+       * con la lista vacía casi siempre significa que el parser dejó de
+       * encontrar los campos, no que el mercado esté desierto. Cerrar todo a
+       * ciegas con esa señal vaciaría el panel entero por un cambio de la API.
+       */
+      warnings.push(
+        "El mercado ha devuelto cero jugadores. No se ha cerrado ninguna " +
+          "oferta por si acaso: un mercado vacío casi siempre es un parser " +
+          "roto, no un mercado sin nadie. Si se repite, revisa " +
+          "parseMarketListing con `npm run sync -- --dry-run --shape`.",
+      );
     }
 
     /* --- 6. Feed de actividad -------------------------------------- */
