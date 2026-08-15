@@ -1,71 +1,338 @@
 @import "tailwindcss";
 
-/**
- * Tokens de la interfaz.
+/* ==================================================================== *
+ * TIPOGRAFÍA
  *
- * Se definen aquí y no sueltos por las páginas para que cambiar el aspecto sea
- * tocar un sitio. Los nombres dicen para qué sirve cada color, no de qué color
- * es: `--surface` sobrevive a cambiar de gris a beige; `--neutral-100` no.
- */
-:root {
-  color-scheme: light dark;
+ * Las dos familias se sirven desde el propio dominio: ni una petición a
+ * terceros, ni un salto de fuente a media carga, ni una dependencia de
+ * red en el build.
+ *
+ * Archivo es una grotesca de origen editorial con eje de anchura, que es
+ * justo lo que pide un producto de tablas y marcadores: se estrecha para
+ * las cifras grandes sin cambiar de familia.
+ *
+ * IBM Plex Mono se reserva a lo que tiene que alinearse o leerse como
+ * dato: columnas de dinero, etiquetas, códigos. Un producto de números
+ * gana más con dos voces claras que con una sola bien intencionada.
+ * ==================================================================== */
 
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --border: #e4e4e7;
-  --text: #18181b;
-  --muted: #71717a;
-  --accent: #059669;
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-latin.woff2") format("woff2");
+  font-weight: 300 800;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
-  /* Estados. El mismo trío en toda la app: bien, ojo, mal. */
-  --good: #059669;
-  --warn: #b45309;
-  --bad: #dc2626;
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-latin-ext.woff2") format("woff2");
+  font-weight: 300 800;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plexmono-400-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plexmono-500-latin.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plexmono-600-latin.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ==================================================================== *
+ * TOKENS
+ *
+ * El tema base es el claro —papel de cuaderno, cálido, no blanco de
+ * pantalla— y el oscuro es el mismo sistema con la tinta invertida:
+ * verde muy apagado, del color de un campo de noche.
+ *
+ * Los nombres dicen para qué sirve cada color, no de qué color es:
+ * `--color-raised` sobrevive a repintar la app entera; `--color-zinc-100`
+ * no. El acento (lima de foco de estadio) es un **relleno**, no un color
+ * de texto: sobre él siempre va tinta. Para texto de marca existe
+ * `--color-brand-ink`, que en claro baja a oliva para poder leerse.
+ * ==================================================================== */
+
+@theme {
+  --font-sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Superficies, de la más al fondo a la más cerca. */
+  --color-canvas: #f2f1ea;
+  --color-surface: #fbfaf5;
+  --color-raised: #ebe9df;
+  --color-sunken: #e4e2d6;
+
+  --color-line: #dbd8ca;
+  --color-line-strong: #c4c0ae;
+
+  --color-ink: #141a16;
+  --color-muted: #59635c;
+  --color-faint: #6b736c;
+
+  --color-brand: #c9f24b;
+  --color-on-brand: #101a08;
+  --color-brand-ink: #3c6410;
+  /* Relleno de las bandas de incertidumbre: la lima pura sobre papel se
+     pierde, y sobre tinta deslumbra. Cada tema lleva la suya. */
+  --color-band: #c2e75f;
+
+  --color-good: #0f7d58;
+  --color-warn: #9a5804;
+  --color-bad: #bb3527;
+
+  --radius-panel: 14px;
+  --radius-control: 10px;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #09090b;
-    --surface: #18181b;
-    --surface-2: #27272a;
-    --border: #27272a;
-    --text: #fafafa;
-    --muted: #a1a1aa;
-    --accent: #34d399;
+  :root:not([data-theme="light"]) {
+    --color-canvas: #0a0e0c;
+    --color-surface: #101613;
+    --color-raised: #18211d;
+    --color-sunken: #070a09;
 
-    --good: #34d399;
-    --warn: #fbbf24;
-    --bad: #f87171;
+    --color-line: #212d27;
+    --color-line-strong: #2f3e37;
+
+    --color-ink: #e9efea;
+    --color-muted: #a2aea7;
+    --color-faint: #8d9a93;
+
+    --color-brand: #c9f24b;
+    --color-on-brand: #0a0e0c;
+    --color-brand-ink: #c9f24b;
+    --color-band: #4f6d23;
+
+    --color-good: #56d6a0;
+    --color-warn: #f0b440;
+    --color-bad: #ff8272;
   }
 }
 
+:root[data-theme="dark"] {
+  --color-canvas: #0a0e0c;
+  --color-surface: #101613;
+  --color-raised: #18211d;
+  --color-sunken: #070a09;
+
+  --color-line: #212d27;
+  --color-line-strong: #2f3e37;
+
+  --color-ink: #e9efea;
+  --color-muted: #a2aea7;
+  --color-faint: #8d9a93;
+
+  --color-brand: #c9f24b;
+  --color-on-brand: #0a0e0c;
+  --color-brand-ink: #c9f24b;
+  --color-band: #4f6d23;
+
+  --color-good: #56d6a0;
+  --color-warn: #f0b440;
+  --color-bad: #ff8272;
+}
+
+/* ==================================================================== *
+ * BASE
+ * ==================================================================== */
+
+html {
+  color-scheme: light dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 body {
-  background: var(--bg);
-  color: var(--text);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-synthesis-weight: none;
   @apply antialiased;
 }
 
-/* Números en columnas que cuadran: dinero, puntos, probabilidades. */
+/* Un anillo de foco propio, del color de la marca y visible sobre las dos
+   tintas. El del navegador desaparece sobre el fondo oscuro. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-brand) 35%, transparent);
+  color: var(--color-ink);
+}
+
+/* La barra de desplazamiento también es interfaz. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* ==================================================================== *
+ * UTILIDADES DEL SISTEMA
+ * ==================================================================== */
+
+/**
+ * Etiqueta de instrumento: mono, versalitas, muy espaciada. Es la voz con
+ * la que la app nombra los datos, y por eso no se usa para nada más.
+ */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/** Cifras que tienen que cuadrar en columna: dinero, puntos, porcentajes. */
 .nums {
   font-variant-numeric: tabular-nums;
 }
 
 /**
- * Las tablas anchas se desplazan dentro de su caja, nunca empujan la página.
- * En un móvil de 375px una tabla de siete columnas rompe el layout entero si
- * no se contiene aquí.
+ * Cifra de marcador. El eje de anchura de Archivo se estrecha para que un
+ * número largo siga cabiendo sin encoger el cuerpo, que es como se resuelve
+ * en un panel de estadio y no en una hoja de cálculo.
+ */
+.scoreline {
+  font-variant-numeric: tabular-nums;
+  font-stretch: 88%;
+  letter-spacing: -0.02em;
+}
+
+/** La unidad acompaña a la cifra, no compite con ella. */
+.unit {
+  font-family: var(--font-mono);
+  font-size: 0.68em;
+  font-weight: 500;
+  color: var(--color-faint);
+  letter-spacing: 0.02em;
+}
+
+/**
+ * Marca de sección. Dos píxeles de lima a la izquierda del título: es el
+ * único adorno recurrente de la interfaz, y sirve para que la vista
+ * encuentre dónde empieza cada bloque en una página larga de datos.
+ */
+.tick::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 0.75em;
+  margin-right: 0.6em;
+  vertical-align: baseline;
+  background: var(--color-brand);
+  border-radius: 1px;
+}
+
+/**
+ * Las tablas anchas se desplazan dentro de su caja, nunca empujan la
+ * página. En un móvil de 375px una tabla de siete columnas rompe el layout
+ * entero si no se contiene aquí. El degradado del borde derecho avisa de
+ * que hay más columnas fuera de pantalla.
  */
 .table-scroll {
-  @apply -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0;
+  @apply overflow-x-auto;
+  overscroll-behavior-x: contain;
+}
+
+/** Área táctil mínima cómoda en móvil. */
+.tap {
+  min-height: 44px;
+}
+
+/** Pulsación con respuesta física: sin esto los botones parecen imágenes. */
+.press {
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.press:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 code {
-  @apply rounded px-1 py-0.5 text-[0.9em];
-  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--color-raised);
+  color: var(--color-ink);
 }
 
-/* Área táctil mínima cómoda en móvil. */
-.tap {
-  min-height: 44px;
+/**
+ * El `<details>` nativo trae un triángulo que no combina con nada. Se quita
+ * aquí una vez en lugar de en cada uso.
+ */
+summary {
+  list-style: none;
+  cursor: pointer;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+
+/** Carga: un latido lento, no un destello. */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.skeleton {
+  background: var(--color-raised);
+  border-radius: 6px;
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

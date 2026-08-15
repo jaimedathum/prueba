@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { DesktopNav, MobileNav } from "./nav";
+import { MobileTabs, OverflowMenu, Sidebar, Wordmark } from "./nav";
 import { SyncButton } from "./sync-button";
 
 export const metadata: Metadata = {
-  title: "Fantasy Advisor",
+  title: {
+    default: "Fantasy Advisor",
+    template: "%s · Fantasy Advisor",
+  },
   description: "Asistente de decisión para LaLiga Fantasy Oficial",
 };
 
@@ -24,49 +27,77 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+    { media: "(prefers-color-scheme: light)", color: "#f2f1ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0e0c" },
   ],
 };
 
 /**
+ * Aplica el tema elegido **antes** de pintar.
+ *
+ * Sin esto, quien tiene el sistema en claro y la app en oscuro ve un
+ * fogonazo blanco en cada navegación completa. Va en línea y síncrono a
+ * propósito: es la única forma de que corra antes del primer pintado.
+ */
+const THEME_SCRIPT = `try{var t=localStorage.getItem('fa-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t}}catch(e){}`;
+
+/**
  * Estructura de la app.
  *
- * Móvil primero: cabecera fija arriba con lo único que se necesita siempre
- * —dónde estás y el botón de sincronizar— y navegación abajo, al alcance del
- * pulgar. En pantallas grandes la navegación sube a la cabecera y la barra
- * inferior desaparece.
+ * Dos formas distintas para dos usos distintos. En el móvil —que es donde
+ * se consulta, de pie y con una mano, mientras se mira la app oficial— la
+ * navegación va abajo y la cabecera se queda con lo único imprescindible:
+ * sincronizar. En escritorio, donde se analiza sentado, aparece una columna
+ * fija con los destinos agrupados por la pregunta que responden.
  */
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        {/* Las dos fuentes se sirven de este mismo dominio: se precargan las
+            que se usan en el primer pintado y nada más. */}
+        <link
+          rel="preload"
+          href="/fonts/archivo-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/plexmono-500-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
-        <header
-          className="sticky top-0 z-40 border-b backdrop-blur"
-          style={{
-            background: "color-mix(in oklab, var(--bg) 85%, transparent)",
-            borderColor: "var(--border)",
-          }}
-        >
-          <div className="relative mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
-            <span className="text-sm font-semibold tracking-tight">
-              Fantasy Advisor
-            </span>
-            <DesktopNav />
-            <div className="ml-auto">
-              <SyncButton />
-            </div>
-          </div>
-        </header>
+        <Sidebar />
 
-        {/* El padding inferior deja sitio a la barra de navegación fija. */}
-        <div className="mx-auto max-w-5xl px-4 py-6 pb-28 sm:pb-10">
-          {children}
+        <div className="lg:pl-[248px]">
+          <header className="sticky top-0 z-30 border-b border-line bg-[color-mix(in_oklab,var(--color-canvas)_88%,transparent)] backdrop-blur-md">
+            <div className="mx-auto flex max-w-[1120px] items-center gap-3 px-4 py-2.5 lg:px-8">
+              {/* En escritorio la marca ya está en la columna izquierda. */}
+              <div className="lg:hidden">
+                <Wordmark />
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <SyncButton />
+                <OverflowMenu />
+              </div>
+            </div>
+          </header>
+
+          {/* El relleno inferior deja sitio a la barra de navegación fija. */}
+          <div className="mx-auto max-w-[1120px] px-4 py-6 pb-28 lg:px-8 lg:py-9 lg:pb-12">
+            {children}
+          </div>
         </div>
 
-        <MobileNav />
+        <MobileTabs />
       </body>
     </html>
   );

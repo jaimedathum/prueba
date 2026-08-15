@@ -2,11 +2,123 @@
 
 import { useActionState } from "react";
 import {
+  Button,
+  Checkbox,
+  Disclosure,
+  Field,
+  Input,
+  Notice,
+  Output,
+  Panel,
+  Table,
+  Td,
+  Th,
+} from "../ui";
+import {
   diagnoseAction,
   runSyncAction,
   type DiagnosisState,
   type SyncState,
 } from "./actions";
+
+/**
+ * Disparador manual de la sincronización. El resultado se enseña entero
+ * —contadores, avisos e informe de mapeo— porque es justo lo que hace falta
+ * para saber si la ingesta va bien o si un parser está fallando en silencio.
+ *
+ * Va sin caja propia: lo envuelve el paso 3 de la página de arranque.
+ */
+export function SyncForm() {
+  const [state, formAction, pending] = useActionState<SyncState | null, FormData>(
+    runSyncAction,
+    null,
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[13px] leading-relaxed text-muted">
+        El cron lo hace solo cada día, pero después del primer login conviene
+        lanzarlo a mano para no esperar 24 horas.
+      </p>
+
+      <form action={formAction} className="space-y-4">
+        <Field label="Secreto del despliegue">
+          <Input name="secret" type="password" required />
+        </Field>
+
+        <div className="space-y-3">
+          <Checkbox
+            name="dryRun"
+            label="Solo lectura"
+            hint="Lee de la API pero no escribe nada. Útil para la primera prueba."
+          />
+          <Checkbox
+            name="shape"
+            defaultChecked
+            label="Informe de mapeo de campos"
+            hint="Qué campos no se encontraron y cuáles llegan sin que nadie los lea. Es lo que cierra las incógnitas de docs/reglas.md."
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="primary" disabled={pending}>
+            {pending ? "Sincronizando…" : "Sincronizar ahora"}
+          </Button>
+          {pending && (
+            <p className="text-[12px] leading-snug text-faint">
+              Puede tardar un minuto: las peticiones van en serie y con pausa
+              entre ellas, a propósito.
+            </p>
+          )}
+        </div>
+      </form>
+
+      {state && <Result state={state} />}
+    </div>
+  );
+}
+
+function Result({ state }: { state: SyncState }) {
+  return (
+    <div className="space-y-3">
+      <Output tone={state.ok ? "good" : "warn"}>{state.message}</Output>
+
+      {state.stats && state.stats.length > 0 && (
+        <ul>
+          {state.stats.map(([key, value]) => (
+            <li
+              key={key}
+              className="flex items-baseline justify-between gap-4 border-b border-line py-1.5 last:border-b-0"
+            >
+              <span className="eyebrow">{key}</span>
+              <span className="nums font-mono text-[13px] font-medium">
+                {value}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {state.warnings && state.warnings.length > 0 && (
+        <Notice tone="warn" title={`Avisos (${state.warnings.length})`}>
+          <ul className="list-disc space-y-1 pl-4 marker:text-faint">
+            {state.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </Notice>
+      )}
+
+      {state.shape && (
+        <Disclosure summary="Informe de mapeo de campos">
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-control border border-line p-3 font-mono text-[11px] leading-relaxed">
+            {state.shape}
+          </pre>
+        </Disclosure>
+      )}
+    </div>
+  );
+}
 
 /**
  * Diagnóstico de la API. Aparece aparte de la sincronización porque se usa
@@ -20,214 +132,71 @@ export function DiagnoseForm() {
   >(diagnoseAction, null);
 
   return (
-    <section className="space-y-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-      <header>
-        <h2 className="font-medium">Diagnosticar la API</h2>
-        <p className="text-sm text-neutral-500">
+    <Panel className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
+          Diagnosticar la API
+        </h2>
+        <p className="text-[13px] leading-relaxed text-muted">
           Si la sincronización falla con un 404 o un 401, esto dice dónde está
           el problema en vez de dejarte probando a ciegas.
         </p>
-      </header>
+      </div>
 
-      <form action={formAction} className="space-y-3">
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Secreto del despliegue</span>
-          <input
-            name="secret"
-            type="password"
-            required
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium disabled:opacity-50 dark:border-neutral-700"
-        >
+      <form action={formAction} className="space-y-4">
+        <Field label="Secreto del despliegue">
+          <Input name="secret" type="password" required />
+        </Field>
+        <Button type="submit" disabled={pending}>
           {pending ? "Probando…" : "Diagnosticar"}
-        </button>
+        </Button>
       </form>
 
       {state && (
         <div className="space-y-3">
-          <pre
-            className={`overflow-x-auto whitespace-pre-wrap rounded-lg border p-3 text-sm ${
-              state.ok
-                ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-                : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-            }`}
-          >
-            {state.message}
-          </pre>
+          <Output tone={state.ok ? "good" : "warn"}>{state.message}</Output>
 
           {state.results && state.results.length > 0 && (
-            <table className="w-full text-left text-xs">
-              <thead className="text-neutral-500">
+            <Table>
+              <thead>
                 <tr>
-                  <th className="py-1">Base</th>
-                  <th className="py-1">Ruta</th>
-                  <th className="py-1 text-right">Estado</th>
+                  <Th>Base</Th>
+                  <Th>Ruta</Th>
+                  <Th align="right">Estado</Th>
                 </tr>
               </thead>
               <tbody>
                 {state.results.map((result, index) => (
-                  <tr
-                    key={`${result.base}${result.path}${index}`}
-                    className="border-t border-neutral-200 dark:border-neutral-800"
-                  >
-                    <td className="break-all py-1 pr-2">{result.base}</td>
-                    <td className="break-all py-1 pr-2">{result.path}</td>
-                    <td className="py-1 text-right tabular-nums">
+                  <tr key={`${result.base}${result.path}${index}`}>
+                    <Td className="break-all font-mono text-[11px] text-faint">
+                      {result.base}
+                    </Td>
+                    <Td className="break-all font-mono text-[11px]">
+                      {result.path}
+                    </Td>
+                    <Td align="right" numeric>
                       {result.status ?? result.error ?? "—"}
-                    </td>
+                    </Td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           )}
 
           {state.me && (
-            <details className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-800">
-              <summary className="cursor-pointer font-medium">
-                Tu usuario, según la API
-              </summary>
-              <p className="mt-1 text-xs text-neutral-500">
+            <Disclosure summary="Ver tu usuario, según la API">
+              <p className="text-[12px] leading-relaxed text-faint">
                 Aquí dentro están los identificadores de tu liga y de tu equipo,
                 que son los que hay que poner en <code>FANTASY_LEAGUE_ID</code> y{" "}
                 <code>FANTASY_TEAM_ID</code>.
               </p>
-              <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap text-xs">
+              <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-control border border-line p-3 font-mono text-[11px] leading-relaxed">
                 {state.me}
               </pre>
-            </details>
+            </Disclosure>
           )}
         </div>
       )}
-    </section>
-  );
-}
-
-/**
- * Disparador manual de la sincronización. El resultado se enseña entero
- * —contadores, avisos e informe de mapeo— porque es justo lo que hace falta
- * para saber si la ingesta va bien o si un parser está fallando en silencio.
- */
-export function SyncForm() {
-  const [state, formAction, pending] = useActionState<SyncState | null, FormData>(
-    runSyncAction,
-    null,
-  );
-
-  return (
-    <section className="space-y-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-      <header>
-        <h2 className="font-medium">Sincronizar ahora</h2>
-        <p className="text-sm text-neutral-500">
-          El cron lo hace solo cada día, pero después del primer login conviene
-          lanzarlo a mano para no esperar 24 horas.
-        </p>
-      </header>
-
-      <form action={formAction} className="space-y-3">
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Secreto del despliegue</span>
-          <input
-            name="secret"
-            type="password"
-            required
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </label>
-
-        <label className="flex items-start gap-2 text-sm">
-          <input name="dryRun" type="checkbox" className="mt-1" />
-          <span>
-            Solo lectura
-            <span className="block text-xs text-neutral-500">
-              Lee de la API pero no escribe nada. Útil para la primera prueba.
-            </span>
-          </span>
-        </label>
-
-        <label className="flex items-start gap-2 text-sm">
-          <input name="shape" type="checkbox" defaultChecked className="mt-1" />
-          <span>
-            Informe de mapeo de campos
-            <span className="block text-xs text-neutral-500">
-              Qué campos no se encontraron y cuáles llegan sin que nadie los
-              lea. Es lo que cierra las incógnitas de <code>docs/reglas.md</code>.
-            </span>
-          </span>
-        </label>
-
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-        >
-          {pending ? "Sincronizando…" : "Sincronizar"}
-        </button>
-
-        {pending && (
-          <p className="text-xs text-neutral-500">
-            Puede tardar un minuto: las peticiones van en serie y con pausa
-            entre ellas, a propósito.
-          </p>
-        )}
-      </form>
-
-      {state && <Result state={state} />}
-    </section>
-  );
-}
-
-function Result({ state }: { state: SyncState }) {
-  return (
-    <div className="space-y-3">
-      <pre
-        className={`overflow-x-auto whitespace-pre-wrap rounded-lg border p-3 text-sm ${
-          state.ok
-            ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-            : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-        }`}
-      >
-        {state.message}
-      </pre>
-
-      {state.stats && state.stats.length > 0 && (
-        <table className="w-full text-sm">
-          <tbody>
-            {state.stats.map(([key, value]) => (
-              <tr key={key} className="border-b border-neutral-200 dark:border-neutral-800">
-                <td className="py-1 pr-4 text-neutral-500">{key}</td>
-                <td className="py-1 text-right tabular-nums">{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {state.warnings && state.warnings.length > 0 && (
-        <div className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          <p className="font-medium">Avisos</p>
-          <ul className="list-disc space-y-1 pl-5">
-            {state.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {state.shape && (
-        <details className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-800">
-          <summary className="cursor-pointer font-medium">
-            Informe de mapeo de campos
-          </summary>
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs">
-            {state.shape}
-          </pre>
-        </details>
-      )}
-    </div>
+    </Panel>
   );
 }
