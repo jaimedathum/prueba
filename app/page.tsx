@@ -1,6 +1,17 @@
 import { getDashboardData, formatMoney } from "@/lib/queries";
 import { SetupNotice } from "./setup-notice";
-import { Badge, Card, Empty, Page, Section, Stat, StatGrid } from "./ui";
+import {
+  Badge,
+  Empty,
+  Figure,
+  Notice,
+  Page,
+  Row,
+  Section,
+  Table,
+  Td,
+  Th,
+} from "./ui";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +22,11 @@ export const dynamic = "force-dynamic";
  * lo sincronizado coincide con la app oficial. Por eso enseña la cláusula y su
  * ratio, que es lo que no se ve cómodamente en el juego.
  *
- * En móvil los jugadores van en tarjetas y no en tabla: seis columnas en 375px
- * obligan a desplazar en horizontal para leer una fila, que es justo lo que
- * hace inservible una tabla en el bolsillo.
+ * El mismo listado se pinta de dos maneras. En móvil, una ficha por jugador:
+ * seis columnas en 375px obligan a desplazar en horizontal para leer una fila,
+ * que es justo lo que hace inservible una tabla en el bolsillo. A partir de
+ * tablet, tabla de verdad, que es como se compara una plantilla entera de un
+ * vistazo.
  */
 export default async function Home() {
   let data;
@@ -31,141 +44,161 @@ export default async function Home() {
   const enRiesgo = squad.filter(
     (p) => p.clauseRatio !== null && p.clauseRatio < 1,
   ).length;
+  const valorTotal = squad.reduce((total, p) => total + (p.marketValue ?? 0), 0);
 
   return (
     <Page
+      eyebrow="Mi equipo"
       title={me ? me.teamName : "Equipo sin identificar"}
-      subtitle={
-        me?.reportedBalance != null
-          ? `Saldo ${formatMoney(me.reportedBalance)}`
-          : "Saldo no disponible todavía"
-      }
+      subtitle="El ratio es cláusula ÷ valor. Por debajo de 1, el jugador le sale barato a un rival: pagarla le cuesta menos de lo que vale lo que se lleva."
+      meta={[
+        {
+          label: "Saldo",
+          value:
+            me?.reportedBalance != null
+              ? formatMoney(me.reportedBalance)
+              : "sin dato",
+        },
+        { label: "Valor plantilla", value: formatMoney(valorTotal) },
+        // El dato que antes ocupaba un bloque de aviso entero cabe aquí,
+        // que es donde se miran los números de la pantalla.
+        { label: "Cláusula bajo valor", value: enRiesgo },
+        {
+          label: "Última lectura",
+          value: lastSync
+            ? lastSync.startedAt.toLocaleString("es-ES", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "nunca",
+        },
+      ]}
     >
-      <Card>
-        <StatGrid>
-          <Stat label="Jugadores" value={squad.length} />
-          <Stat
-            label="Cláusula por debajo del valor"
-            value={enRiesgo}
-            tone={enRiesgo > 0 ? "warn" : "good"}
-            hint={enRiesgo > 0 ? "salen baratos a un rival" : "ninguno barato"}
-          />
-          <Stat
-            label="Última sincronización"
-            value={
-              lastSync
-                ? lastSync.startedAt.toLocaleTimeString("es-ES", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "—"
-            }
-            hint={
-              lastSync
-                ? lastSync.startedAt.toLocaleDateString("es-ES")
-                : "sin ejecutar"
-            }
-            tone={lastSync?.status === "failed" ? "bad" : undefined}
-          />
-          <Stat
-            label="Estado"
-            value={lastSync ? estadoLegible(lastSync.status) : "—"}
-            tone={
-              lastSync?.status === "ok"
-                ? "good"
-                : lastSync?.status === "failed"
-                  ? "bad"
-                  : "muted"
-            }
-          />
-        </StatGrid>
+      {lastSync?.status === "failed" && (
+        <Notice tone="bad" title="La última sincronización falló">
+          {lastSync.error ?? "Sin detalle del error."}
+        </Notice>
+      )}
 
-        {lastSync?.error && (
-          <p className="mt-3 text-sm" style={{ color: "var(--bad)" }}>
-            {lastSync.error}
-          </p>
-        )}
-      </Card>
-
-      <Section
-        title={`Mi plantilla (${squad.length})`}
-        hint="El ratio es cláusula ÷ valor. Por debajo de 1, el jugador le sale barato a un rival."
-      >
+      <Section title="Mi plantilla" aside={`${squad.length} jugadores`}>
         {squad.length === 0 ? (
           <Empty>
             Sin jugadores todavía. Comprueba en{" "}
-            <a className="underline" href="/setup">
+            <a className="underline underline-offset-2" href="/setup">
               la puesta en marcha
             </a>{" "}
             que la sincronización ha identificado tu equipo dentro de la liga.
           </Empty>
         ) : (
-          <ul className="space-y-2">
-            {squad.map((row) => (
-              <li key={row.playerId}>
-                <Card className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate font-medium">{row.name}</span>
-                      {row.overriddenFields.length > 0 && (
-                        <span
-                          title={`Corregido a mano: ${row.overriddenFields.join(", ")}`}
-                        >
-                          <Badge tone="warn">manual</Badge>
-                        </span>
-                      )}
-                      {row.status !== "ok" && (
-                        <Badge tone={row.status === "injured" ? "bad" : "warn"}>
-                          {row.status}
-                        </Badge>
-                      )}
-                    </div>
-                    <div
-                      className="mt-0.5 text-xs"
-                      style={{ color: "var(--muted)" }}
-                    >
-                      {row.position} · valor {formatMoney(row.marketValue)}
-                    </div>
-                  </div>
+          <>
+            {/* Móvil: una ficha por jugador. */}
+            <ul className="border-t border-line sm:hidden">
+              {squad.map((row) => (
+                <Row key={row.playerId} className="items-center">
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-[14px] font-medium">
+                        {row.name}
+                      </span>
+                      <Marcas row={row} />
+                    </span>
+                    <span className="eyebrow mt-1 block">
+                      {row.position} · {formatMoney(row.marketValue)}
+                    </span>
+                  </span>
 
-                  <div className="shrink-0 text-right">
-                    <div className="nums text-sm font-medium">
+                  <span className="shrink-0 text-right">
+                    <Figure className="block text-[13px]">
                       {formatMoney(row.buyoutClause)}
-                    </div>
-                    <div className="text-xs">
-                      <ClauseRatio ratio={row.clauseRatio} />
-                    </div>
-                  </div>
-                </Card>
-              </li>
-            ))}
-          </ul>
+                    </Figure>
+                    <ClauseRatio ratio={row.clauseRatio} />
+                  </span>
+                </Row>
+              ))}
+            </ul>
+
+            {/* Tablet en adelante: tabla, que compara mejor. */}
+            <div className="hidden sm:block">
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Jugador</Th>
+                    <Th>Pos</Th>
+                    <Th align="right">Valor</Th>
+                    <Th align="right">Cláusula</Th>
+                    <Th align="right">Ratio</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {squad.map((row) => (
+                    <tr key={row.playerId}>
+                      <Td>
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium">{row.name}</span>
+                          <Marcas row={row} />
+                        </span>
+                      </Td>
+                      <Td className="font-mono text-[11px] uppercase text-faint">
+                        {row.position}
+                      </Td>
+                      <Td align="right" numeric>
+                        {formatMoney(row.marketValue)}
+                      </Td>
+                      <Td align="right" numeric>
+                        {formatMoney(row.buyoutClause)}
+                      </Td>
+                      <Td align="right">
+                        <ClauseRatio ratio={row.clauseRatio} />
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          </>
         )}
       </Section>
     </Page>
   );
 }
 
-function estadoLegible(status: string): string {
+/** Los distintivos de una fila: corregido a mano, lesionado, sancionado. */
+function Marcas({
+  row,
+}: {
+  row: { overriddenFields: string[]; status: string };
+}) {
   return (
-    { ok: "Correcta", failed: "Con error", running: "En curso" }[status] ??
-    status
+    <>
+      {row.overriddenFields.length > 0 && (
+        <span title={`Corregido a mano: ${row.overriddenFields.join(", ")}`}>
+          <Badge tone="muted">manual</Badge>
+        </span>
+      )}
+      {row.status !== "ok" && (
+        <Badge tone={row.status === "injured" ? "bad" : "warn"}>
+          {row.status}
+        </Badge>
+      )}
+    </>
   );
 }
 
 function ClauseRatio({ ratio }: { ratio: number | null }) {
   if (ratio === null) {
-    return <span style={{ color: "var(--muted)" }}>sin cláusula</span>;
+    return <span className="text-[11px] text-faint">sin cláusula</span>;
   }
 
   // Solo un aviso visual: decidir si blindar necesita además la caja de los
   // rivales y a quién le interesa el jugador, que es lo que hay en /riesgo.
-  const tone =
-    ratio < 1 ? "var(--bad)" : ratio < 1.5 ? "var(--warn)" : "var(--muted)";
+  const tone = ratio < 1 ? "bad" : ratio < 1.5 ? "warn" : "muted";
 
   return (
-    <span className="nums" style={{ color: tone }}>
-      {ratio.toFixed(2)}× cláusula
-    </span>
+    <Figure tone={tone} className="text-[12px]">
+      {ratio.toFixed(2)}
+      <span className="unit">×</span>
+    </Figure>
   );
 }

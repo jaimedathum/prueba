@@ -2,89 +2,261 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import {
+  AjustesIcon,
+  ApoyoIcon,
+  CorreccionesIcon,
+  MercadoIcon,
+  OnceIcon,
+  PlantillaIcon,
+  RiesgoIcon,
+  RivalesIcon,
+} from "./icons";
+import { DONATE_URL } from "./support-config";
 
 /**
  * Navegación.
  *
- * En móvil va **abajo**, fija, con iconos: es donde llega el pulgar y donde
- * la espera cualquiera que use el móvil de pie o con una mano. Cinco destinos
- * caben justos, así que las etiquetas son cortas y el área táctil llega a los
- * 44px aunque el texto sea pequeño.
+ * En escritorio es una **cabecera de periódico**: nombre arriba, regla
+ * gruesa, y debajo la tira de secciones en versalitas estrechas. No hay
+ * columna lateral, y no es por gusto: la pantalla de rivales tiene tablas
+ * de ocho columnas, y regalarle 250px fijos a un menú que siempre dice lo
+ * mismo era pagar ancho de tabla por comodidad de nadie.
  *
- * A partir de tablet pasa arriba en horizontal, donde sobra sitio y una barra
- * inferior fija solo estorbaría.
+ * En móvil la tira baja al pie, fija, porque es donde llega el pulgar de
+ * quien consulta esto de pie mientras mira la app oficial, y ahí el
+ * pictograma sí trabaja: se reconoce de reojo y sin leer.
+ *
+ * Los iconos son propios (`app/icons.tsx`) y hablan el idioma del resto de
+ * la página —filete de cabo cuadrado y marca sólida—, no el trazo
+ * redondeado de librería que llevan todas las aplicaciones.
  */
+
+interface Destino {
+  href: string;
+  /** Etiqueta corta, para la tira. */
+  short: string;
+  /** Etiqueta larga, para el menú y los sitios con espacio. */
+  label: string;
+  icon: (props: { size?: number }) => React.ReactElement;
+}
+
+const SQUAD: Destino = {
+  href: "/",
+  short: "Plantilla",
+  label: "Mi plantilla",
+  icon: PlantillaIcon,
+};
+const LINEUP: Destino = {
+  href: "/alineacion",
+  short: "Once",
+  label: "Alineación",
+  icon: OnceIcon,
+};
+const MARKET: Destino = {
+  href: "/mercado",
+  short: "Mercado",
+  label: "Mercado y pujas",
+  icon: MercadoIcon,
+};
+const RIVALS: Destino = {
+  href: "/rivales",
+  short: "Rivales",
+  label: "Rivales",
+  icon: RivalesIcon,
+};
+const RISK: Destino = {
+  href: "/riesgo",
+  short: "Riesgo",
+  label: "Riesgo y cláusulas",
+  icon: RiesgoIcon,
+};
+const OVERRIDES: Destino = {
+  href: "/overrides",
+  short: "Correcciones",
+  label: "Correcciones manuales",
+  icon: CorreccionesIcon,
+};
+const SETUP: Destino = {
+  href: "/setup",
+  short: "Ajustes",
+  label: "Puesta en marcha",
+  icon: AjustesIcon,
+};
+
+/** Los cinco que caben cómodos en 375px sin cortar etiquetas. */
+const TABS = [SQUAD, LINEUP, MARKET, RIVALS, RISK];
+
+/** Lo secundario: en escritorio al final de la tira, en móvil en el menú. */
+const SECONDARY = [OVERRIDES, SETUP];
+
+/* ------------------------------------------------------------------ *
+ * Marca
+ * ------------------------------------------------------------------ */
 
 /**
- * Cinco destinos en la barra inferior: es lo que cabe cómodo en 375px sin
- * que las etiquetas se corten. Los que no entran no desaparecen, van en la
- * de escritorio y enlazados desde donde hacen falta.
+ * El campo visto desde arriba, reducido a lo que sigue siendo
+ * reconocible a 24 píxeles: línea de medio campo, círculo central y las
+ * dos áreas. Cuadrado y no redondeado, como el resto del sistema.
  */
-const LINKS = [
-  { href: "/", label: "Plantilla", icon: SquadIcon },
-  { href: "/alineacion", label: "Once", icon: PitchIcon },
-  { href: "/mercado", label: "Mercado", icon: MarketIcon },
-  { href: "/rivales", label: "Rivales", icon: RivalsIcon },
-  { href: "/riesgo", label: "Riesgo", icon: RiskIcon },
-] as const;
+export function Mark({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="shrink-0"
+    >
+      <rect width="24" height="24" rx="2" fill="var(--color-brand)" />
+      <g
+        stroke="var(--color-on-brand)"
+        strokeWidth="1.4"
+        strokeLinecap="square"
+        fill="none"
+      >
+        <path d="M3 12h18" />
+        <circle cx="12" cy="12" r="3.6" />
+        <path d="M8.5 3.5v1.8h7V3.5M8.5 20.5v-1.8h7v1.8" />
+      </g>
+    </svg>
+  );
+}
 
-/** En escritorio sobra sitio, así que caben también los secundarios. */
-const EXTRA = [
-  { href: "/overrides", label: "Correcciones" },
-  { href: "/setup", label: "Puesta en marcha" },
-] as const;
+/** La cabecera del periódico: el nombre, compuesto como un rótulo. */
+export function Wordmark() {
+  return (
+    <Link href="/" className="flex items-center gap-2.5 no-underline">
+      <Mark />
+      <span
+        className="slug text-ink"
+        style={{ fontSize: "15px", letterSpacing: "0.03em" }}
+      >
+        Fantasy Advisor
+      </span>
+    </Link>
+  );
+}
 
-export function DesktopNav() {
+/* ------------------------------------------------------------------ *
+ * Tira de secciones (escritorio)
+ * ------------------------------------------------------------------ */
+
+export function SectionStrip() {
   const pathname = usePathname();
 
   return (
-    <nav className="hidden items-center gap-1 sm:flex">
-      {[...LINKS, ...EXTRA].map(({ href, label }) => {
-        const active = isActive(pathname, href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
-            style={{
-              background: active ? "var(--surface-2)" : "transparent",
-              color: active ? "var(--text)" : "var(--muted)",
-            }}
-          >
-            {label}
-          </Link>
-        );
-      })}
+    <nav className="hidden items-stretch lg:flex" aria-label="Secciones">
+      {TABS.map((item) => (
+        <StripLink
+          key={item.href}
+          item={item}
+          active={isActive(pathname, item.href)}
+        />
+      ))}
+      <span aria-hidden className="mx-3 my-2 w-px bg-line" />
+      {SECONDARY.map((item) => (
+        <StripLink
+          key={item.href}
+          item={item}
+          active={isActive(pathname, item.href)}
+          quiet
+        />
+      ))}
     </nav>
   );
 }
 
-export function MobileNav() {
+function StripLink({
+  item,
+  active,
+  quiet = false,
+}: {
+  item: Destino;
+  active: boolean;
+  quiet?: boolean;
+}) {
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      className="relative flex items-center gap-2 px-3.5 py-2.5 font-sans no-underline transition-colors first:pl-0"
+      style={{
+        fontStretch: "82%",
+        fontSize: quiet ? "11px" : "12.5px",
+        fontWeight: active ? 700 : 500,
+        letterSpacing: "0.07em",
+        textTransform: "uppercase",
+        color: active
+          ? "var(--color-ink)"
+          : quiet
+            ? "var(--color-faint)"
+            : "var(--color-muted)",
+      }}
+    >
+      {/* La bandera de la sección activa se apoya sobre la regla gruesa y
+          se traza al llegar. Es una transición y no una animación de
+          entrada a propósito: así también se recoge al salir, y navegar
+          entre dos secciones se ve como un solo movimiento. */}
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[3px] origin-left transition-transform duration-300 ease-out"
+        style={{
+          background: "var(--color-brand)",
+          transform: active ? "scaleX(1)" : "scaleX(0)",
+        }}
+      />
+      <item.icon size={quiet ? 12 : 14} />
+      {item.short}
+    </Link>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Tira de secciones (móvil)
+ * ------------------------------------------------------------------ */
+
+export function MobileTabs() {
   const pathname = usePathname();
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 bg-canvas lg:hidden"
       style={{
-        background: "var(--surface)",
-        borderColor: "var(--border)",
+        borderColor: "var(--color-rule)",
         // La barra de gestos de iOS se come los últimos píxeles.
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
+      aria-label="Secciones"
     >
-      {LINKS.map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, href);
+      {TABS.map((item) => {
+        const active = isActive(pathname, item.href);
         return (
           <Link
-            key={href}
-            href={href}
+            key={item.href}
+            href={item.href}
             aria-current={active ? "page" : undefined}
-            className="tap flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium"
-            style={{ color: active ? "var(--accent)" : "var(--muted)" }}
+            className="tap relative flex flex-col items-center justify-center gap-1.5 px-1 py-2 text-center no-underline"
+            style={{
+              fontStretch: "80%",
+              fontSize: "11px",
+              fontWeight: active ? 700 : 500,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: active ? "var(--color-ink)" : "var(--color-faint)",
+            }}
           >
-            <Icon />
-            {label}
+            <span
+              aria-hidden
+              className="absolute inset-x-0 -top-[2px] h-[3px] origin-left transition-transform duration-300 ease-out"
+              style={{
+                background: "var(--color-brand)",
+                transform: active ? "scaleX(1)" : "scaleX(0)",
+              }}
+            />
+            <item.icon size={17} />
+            {item.short}
           </Link>
         );
       })}
@@ -92,74 +264,163 @@ export function MobileNav() {
   );
 }
 
-/** La raíz solo está activa en exacto; el resto, también en sus subrutas. */
-function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+/* ------------------------------------------------------------------ *
+ * Menú de la cabecera
+ * ------------------------------------------------------------------ */
+
+/** Da acceso en móvil a lo que no cabe abajo, y al tema en cualquier tamaño. */
+export function OverflowMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Cerrar al pulsar fuera o con Escape: un menú que solo se cierra con su
+  // propio botón se queda abierto por encima del contenido.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Más opciones"
+        className="press flex h-9 w-9 items-center justify-center border border-line-strong font-mono text-[13px] leading-none text-muted hover:text-ink"
+      >
+        {open ? "×" : "≡"}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-1.5 w-60 border bg-canvas p-3"
+          style={{ borderColor: "var(--color-rule)" }}
+        >
+          <div className="lg:hidden">
+            <p className="eyebrow pb-1.5">Sistema</p>
+            {SECONDARY.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="tap flex items-center gap-2.5 border-b border-line text-[13px] font-medium text-muted no-underline transition-colors last:border-b-0 hover:text-ink"
+              >
+                <item.icon size={14} />
+                {item.label}
+              </Link>
+            ))}
+            <p className="eyebrow pb-1.5 pt-4">Aspecto</p>
+          </div>
+          <p className="eyebrow hidden pb-1.5 lg:block">Aspecto</p>
+          <ThemeChoices onPick={() => setOpen(false)} />
+
+          {DONATE_URL && (
+            <>
+              <p className="eyebrow pb-1.5 pt-4">Este proyecto</p>
+              <a
+                href={DONATE_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                onClick={() => setOpen(false)}
+                className="tap flex items-center gap-2.5 text-[13px] font-medium text-muted no-underline transition-colors hover:text-ink"
+              >
+                <ApoyoIcon size={14} />
+                Invitar a un café
+              </a>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ *
- * Iconos. En línea y monocromos: heredan el color del enlace activo y no
- * añaden ni una petición de red.
+ * Tema
  * ------------------------------------------------------------------ */
 
-const svg = {
-  width: 20,
-  height: 20,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.75,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
+type Theme = "system" | "light" | "dark";
 
-function SquadIcon() {
+const THEME_KEY = "fa-theme";
+
+const THEMES: { value: Theme; label: string }[] = [
+  { value: "system", label: "El del sistema" },
+  { value: "light", label: "Papel" },
+  { value: "dark", label: "Tinta" },
+];
+
+function ThemeChoices({ onPick }: { onPick: () => void }) {
+  const [theme, setTheme] = useState<Theme>("system");
+
+  // El valor real vive en el DOM desde antes de hidratar (ver el script del
+  // layout). Aquí solo se lee para marcar cuál está puesto.
+  useEffect(() => {
+    const stored = localStorage.getItem(THEME_KEY);
+    setTheme(stored === "light" || stored === "dark" ? stored : "system");
+  }, []);
+
+  const apply = (value: Theme) => {
+    setTheme(value);
+    if (value === "system") {
+      localStorage.removeItem(THEME_KEY);
+      delete document.documentElement.dataset.theme;
+    } else {
+      localStorage.setItem(THEME_KEY, value);
+      document.documentElement.dataset.theme = value;
+    }
+    onPick();
+  };
+
   return (
-    <svg {...svg}>
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-    </svg>
+    <div role="group" aria-label="Tema">
+      {THEMES.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => apply(option.value)}
+          className="tap flex w-full items-center gap-2.5 border-b border-line text-left text-[13px] font-medium transition-colors last:border-b-0 hover:text-ink"
+          style={{
+            color:
+              theme === option.value ? "var(--color-ink)" : "var(--color-muted)",
+          }}
+        >
+          <span
+            aria-hidden
+            className="h-2 w-2 shrink-0"
+            style={{
+              background:
+                theme === option.value
+                  ? "var(--color-brand)"
+                  : "var(--color-line-strong)",
+            }}
+          />
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
-function PitchIcon() {
-  return (
-    <svg {...svg}>
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="M12 4v16" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
+/* ------------------------------------------------------------------ *
+ * Utilidades
+ * ------------------------------------------------------------------ */
 
-function MarketIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M3 6h18l-1.5 12a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2Z" />
-      <path d="M8 6V4a4 4 0 0 1 8 0v2" />
-    </svg>
-  );
-}
-
-function RiskIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M12 3 2 20h20Z" />
-      <path d="M12 10v4" />
-      <path d="M12 17h.01" />
-    </svg>
-  );
-}
-
-function RivalsIcon() {
-  return (
-    <svg {...svg}>
-      <circle cx="8" cy="9" r="3" />
-      <circle cx="17" cy="9" r="3" />
-      <path d="M2 20a6 6 0 0 1 12 0" />
-      <path d="M13 20a6 6 0 0 1 9-5" />
-    </svg>
-  );
+/** La raíz solo está activa en exacto; el resto, también en sus subrutas. */
+function isActive(pathname: string, href: string): boolean {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }

@@ -1,7 +1,19 @@
 import { getLineupDashboard } from "@/lib/engine/lineup-load";
 import { positionCode } from "@/lib/domain/positions";
 import { SetupNotice } from "../setup-notice";
-import { Card, Empty, Notice, Page, Section, Stat, StatGrid } from "../ui";
+import {
+  Disclosure,
+  Empty,
+  Figure,
+  Lede,
+  ModelWarnings,
+  Page,
+  Row,
+  Section,
+  Table,
+  Td,
+  Th,
+} from "../ui";
 import { Pitch } from "../pitch";
 
 export const dynamic = "force-dynamic";
@@ -27,11 +39,11 @@ export default async function AlineacionPage() {
 
   if (!data) {
     return (
-      <Page title="Alineación">
+      <Page eyebrow="Mi equipo" title="Alineación">
         <Empty>
           Todavía no se ha identificado tu equipo dentro de la liga. Pulsa
           Sincronizar arriba, y si sigue igual mira los avisos en{" "}
-          <a className="underline" href="/setup">
+          <a className="underline underline-offset-2" href="/setup">
             la puesta en marcha
           </a>
           .
@@ -44,19 +56,18 @@ export default async function AlineacionPage() {
 
   return (
     <Page
+      eyebrow="Mi equipo"
       title="Alineación"
-      subtitle={`${nextMatchday ? `Jornada ${nextMatchday}` : "Sin jornada pendiente"} · modelo ajustado con ${model.matches} partidos${model.converged ? "" : " (insuficientes)"}`}
+      subtitle="El once se resuelve exacto: se enumeran todas las formaciones legales y dentro de cada una se asigna por flujo de coste mínimo. No es una heurística."
+      meta={[
+        { label: "Jornada", value: nextMatchday ?? "—" },
+        { label: "Dibujo", value: lineup?.formation.name ?? "—" },
+        {
+          label: "Partidos del modelo",
+          value: `${model.matches}${model.converged ? "" : " ⚠"}`,
+        },
+      ]}
     >
-      {warnings.length > 0 ? (
-        <Notice title="Lo que falta y qué se pierde por ello">
-          <ul className="list-disc space-y-1 pl-5">
-            {warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </Notice>
-      ) : null}
-
       {!lineup ? (
         <Empty>
           No hay jugadores suficientes para formar un once con las formaciones
@@ -64,144 +75,147 @@ export default async function AlineacionPage() {
         </Empty>
       ) : (
         <>
-          <Section title={`Once óptimo · ${lineup.formation.name}`}>
-            <Pitch players={lineup.starters} />
+          <Section
+            title="Once óptimo"
+            aside={lineup.formation.name}
+            hint="En el campo, el número es lo que se espera que puntúe cada uno. El color avisa de quién puede dejarte a cero: tiza va bien, ámbar es dudoso y rojo es probable que no juegue."
+          >
+            <div className="grid gap-7 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:items-start lg:gap-10">
+              <Pitch players={lineup.starters} />
 
-            <Card>
-              <StatGrid>
-                <Stat
-                  label="Puntos esperados"
-                  value={lineup.expectedPoints.toFixed(1)}
-                />
-                <Stat label="Formación" value={lineup.formation.name} />
-                <Stat
-                  label="Se espera que no jueguen"
-                  value={lineup.expectedMissing.toFixed(1)}
-                  hint="de los 11"
-                  tone={lineup.expectedMissing >= 2 ? "warn" : "good"}
-                />
-                <Stat label="Jornada" value={nextMatchday ?? "—"} />
-              </StatGrid>
-            </Card>
+              <div className="space-y-7">
+                <div className="flex flex-wrap items-start gap-x-12 gap-y-6">
+                  <Lede
+                    label="Puntos esperados"
+                    value={lineup.expectedPoints.toFixed(1)}
+                    hint="Suma de los once titulares con el dibujo elegido."
+                    accent
+                  />
+                  <Lede
+                    label="Se espera que no jueguen"
+                    value={lineup.expectedMissing.toFixed(1)}
+                    hint="De los once. Por encima de dos, conviene mirar el banquillo antes de cerrar."
+                  />
+                </div>
 
-            <p className="text-xs" style={{ color: "var(--muted)" }}>
-              En el campo, el número es lo que se espera que puntúe cada uno.
-              El color avisa de quién puede dejarte a cero: blanco va bien,
-              ámbar es dudoso y rojo es probable que no juegue.
-            </p>
+                <div>
+                  <p className="eyebrow rule border-b border-line py-2">
+                    Qué cuesta cambiar de dibujo
+                  </p>
+                  <ul>
+                    {lineup.alternatives.map((alternative) => {
+                      const optima = alternative.cost <= 0;
+                      return (
+                        <Row key={alternative.formation}>
+                          <span
+                            className={`text-[13px] ${optima ? "font-semibold" : ""}`}
+                          >
+                            {alternative.formation}
+                          </span>
+                          <span className="flex items-baseline gap-3">
+                            <Figure className="text-[12px]">
+                              {alternative.expectedPoints.toFixed(1)}
+                            </Figure>
+                            <span
+                              className="w-16 text-right font-mono text-[10px] uppercase tracking-[0.1em]"
+                              style={{
+                                color: optima
+                                  ? "var(--color-ink)"
+                                  : "var(--color-faint)",
+                              }}
+                            >
+                              {optima
+                                ? "óptima"
+                                : `−${alternative.cost.toFixed(1)}`}
+                            </span>
+                          </span>
+                        </Row>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            </div>
 
-            <details>
-              <summary className="cursor-pointer text-sm" style={{ color: "var(--muted)" }}>
-                Ver el detalle de los once, con el motivo de cada uno
-              </summary>
-            <div className="table-scroll mt-2">
-              <table className="w-full text-sm">
+            <Disclosure summary="Ver el detalle de los once, con el motivo de cada uno">
+              <Table>
                 <thead>
-                  <tr className="border-b border-neutral-200 text-left text-xs uppercase text-neutral-500 dark:border-neutral-800">
-                    <th className="py-2 pr-3">Jugador</th>
-                    <th className="py-2 pr-3">Pos</th>
-                    <th className="py-2 pr-3 text-right">EP</th>
-                    <th className="py-2 pr-3 text-right">Riesgo de 0</th>
-                    <th className="py-2">Por qué</th>
+                  <tr>
+                    <Th>Jugador</Th>
+                    <Th>Pos</Th>
+                    <Th align="right">Puntos</Th>
+                    <Th align="right">Riesgo de 0</Th>
+                    <Th>Por qué</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {lineup.starters.map((player) => (
-                    <tr
-                      key={player.playerId}
-                      className="border-b border-neutral-100 align-top dark:border-neutral-900"
-                    >
-                      <td className="py-2 pr-3 font-medium">{player.name}</td>
-                      <td className="py-2 pr-3 text-neutral-500">
+                    <tr key={player.playerId}>
+                      <Td className="whitespace-nowrap font-medium">
+                        {player.name}
+                      </Td>
+                      <Td className="font-mono text-[11px] uppercase text-faint">
                         {positionCode(player.positionId)}
-                      </td>
-                      <td className="py-2 pr-3 text-right nums">
+                      </Td>
+                      <Td align="right" numeric>
                         {player.expectedPoints.toFixed(1)}
-                      </td>
-                      <td className="py-2 pr-3 text-right nums">
+                      </Td>
+                      <Td align="right">
                         <RiskCell risk={player.riskOfZero} />
-                      </td>
-                      <td className="py-2 text-xs text-neutral-500">
+                      </Td>
+                      <Td className="min-w-[18rem] text-[12px] leading-relaxed text-muted">
                         {explanations.get(player.playerId)}
-                      </td>
+                      </Td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-            </details>
+              </Table>
+            </Disclosure>
           </Section>
 
-          <section>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-              Qué cuesta cambiar de formación
-            </h2>
-            <ul className="space-y-1 text-sm">
-              {lineup.alternatives.map((alternative) => (
-                <li
-                  key={alternative.formation}
-                  className="flex justify-between gap-4 border-b py-1" style={{ borderColor: "var(--border)" }}
-                >
-                  <span>{alternative.formation}</span>
-                  <span className="nums" style={{ color: "var(--muted)" }}>
-                    {alternative.expectedPoints.toFixed(1)}
-                    {alternative.cost > 0
-                      ? ` (−${alternative.cost.toFixed(1)})`
-                      : " ← óptima"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-              Banquillo
-            </h2>
-            <ul className="space-y-1 text-sm">
+          <Section
+            title="Banquillo"
+            aside={`${lineup.bench.length} fuera`}
+            hint="Ordenados por lo que aportarían si entraran. El primero es tu recambio real."
+          >
+            <ul className="border-t border-line sm:columns-2 sm:gap-10">
               {lineup.bench.map((player) => (
-                <li
-                  key={player.playerId}
-                  className="flex justify-between gap-4 border-b py-1" style={{ borderColor: "var(--border)" }}
-                >
-                  <span>
+                <Row key={player.playerId} className="break-inside-avoid">
+                  <span className="min-w-0 truncate text-[13px]">
                     {player.name}{" "}
-                    <span style={{ color: "var(--muted)" }}>
+                    <span className="font-mono text-[11px] uppercase text-faint">
                       {positionCode(player.positionId)}
                     </span>
                   </span>
-                  <span className="nums" style={{ color: "var(--muted)" }}>
+                  <Figure className="text-[12px]">
                     {player.expectedPoints.toFixed(1)}
-                  </span>
-                </li>
+                    <span className="unit"> pts</span>
+                  </Figure>
+                </Row>
               ))}
             </ul>
-          </section>
+          </Section>
         </>
       )}
 
-      <footer className="border-t pt-4 text-xs" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+      <footer className="rule space-y-2 pt-4 text-[12px] leading-relaxed text-faint">
         <p>
-          El once se resuelve exacto: se enumeran todas las formaciones legales
-          y dentro de cada una se asigna por flujo de coste mínimo. No es una
-          heurística.
-        </p>
-        <p className="mt-1">
           Ventaja de jugar en casa estimada: ×
           {Math.exp(model.homeAdvantage).toFixed(2)} en goles esperados.
           Corrección de marcadores bajos ρ = {model.rho.toFixed(3)}.
         </p>
+        <ModelWarnings warnings={warnings} />
       </footer>
     </Page>
   );
 }
 
 function RiskCell({ risk }: { risk: number }) {
-  const tone =
-    risk > 0.5
-      ? "text-red-600 dark:text-red-400"
-      : risk > 0.2
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-neutral-500";
-  return <span className={tone}>{(risk * 100).toFixed(0)}%</span>;
+  const tone = risk > 0.5 ? "bad" : risk > 0.2 ? "warn" : "muted";
+  return (
+    <Figure tone={tone} className="text-[12px]">
+      {(risk * 100).toFixed(0)}
+      <span className="unit">%</span>
+    </Figure>
+  );
 }

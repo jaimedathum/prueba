@@ -5,6 +5,16 @@ import { getDb } from "@/lib/db";
 import { manualOverrides } from "@/lib/db/schema";
 import { clearOverride, setOverride } from "@/lib/overrides";
 import { SetupNotice } from "../setup-notice";
+import {
+  Button,
+  Empty,
+  Field,
+  Input,
+  Notice,
+  Page,
+  Section,
+  Select,
+} from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -123,119 +133,102 @@ export default async function OverridesPage() {
   }
 
   return (
-    <main className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold">Correcciones manuales</h1>
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
-          Se aplican encima de lo sincronizado. Una resincronización nunca las
-          pisa.
-        </p>
-      </header>
-
+    <Page
+      eyebrow="Sistema"
+      title="Correcciones manuales"
+      subtitle="La mitad manual de la ingesta híbrida: se aplican encima de lo sincronizado y una resincronización nunca las pisa. Por eso mismo la página va bajo llave."
+    >
       {!unlocked && (
-        <p
-          className="rounded border px-3 py-2 text-sm"
-          style={{ borderColor: "var(--border)", color: "var(--muted)" }}
-        >
+        <Notice tone="muted" title="Solo lectura">
           {LOCKED_MESSAGE} Mientras tanto, las correcciones activas se pueden
           consultar pero no cambiar.
-        </p>
+        </Notice>
       )}
 
       {unlocked && (
-      <form action={saveOverride} className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
-          Entidad
-          <select
-            name="entity"
-            className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          >
-            {ENTITIES.map((entity) => (
-              <option key={entity} value={entity}>
-                {entity}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Section
+          title="Nueva corrección"
+          hint="El valor se interpreta como JSON si puede; si no, se guarda tal cual. Así se corrigen números, booleanos y textos con el mismo campo."
+        >
+          <form action={saveOverride} className="grid max-w-3xl gap-5 sm:grid-cols-2">
+            <Field label="Entidad">
+              <Select name="entity">
+                {ENTITIES.map((entity) => (
+                  <option key={entity} value={entity}>
+                    {entity}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
-        <label className="flex flex-col gap-1 text-sm">
-          Id
-          <input
-            name="entityId"
-            required
-            placeholder="id del jugador, manager..."
-            className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </label>
+            <Field label="Id">
+              <Input
+                name="entityId"
+                required
+                placeholder="id del jugador, manager…"
+              />
+            </Field>
 
-        <label className="flex flex-col gap-1 text-sm">
-          Campo
-          <input
-            name="field"
-            required
-            placeholder="marketValue, buyoutClause, status..."
-            className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </label>
+            <Field label="Campo">
+              <Input
+                name="field"
+                required
+                placeholder="marketValue, buyoutClause, status…"
+              />
+            </Field>
 
-        <label className="flex flex-col gap-1 text-sm">
-          Valor
-          <input
-            name="value"
-            required
-            placeholder='12000000  o  "injured"'
-            className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </label>
+            <Field label="Valor">
+              <Input name="value" required placeholder='12000000  o  "injured"' />
+            </Field>
 
-        <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-          Motivo (opcional, pero tu yo de dentro de un mes lo agradecerá)
-          <input
-            name="reason"
-            className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </label>
+            <Field
+              label="Motivo"
+              hint="Opcional, pero tu yo de dentro de un mes lo agradecerá."
+              className="sm:col-span-2"
+            >
+              <Input name="reason" placeholder="Por qué no vale el dato de la API" />
+            </Field>
 
-        <div className="sm:col-span-2">
-          <button
-            type="submit"
-            className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-          >
-            Guardar corrección
-          </button>
-        </div>
-      </form>
+            <div className="sm:col-span-2">
+              <Button type="submit" variant="primary">
+                Guardar corrección
+              </Button>
+            </div>
+          </form>
+        </Section>
       )}
 
-      <section>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-          Activas ({active.length})
-        </h2>
-
+      <Section title="Activas" aside={`${active.length} en vigor`}>
         {active.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--muted)" }}>Ninguna. Todo viene de la API.</p>
+          <Empty>
+            Ninguna corrección activa: todo lo que se enseña viene tal cual de
+            la API.
+          </Empty>
         ) : (
-          <ul className="space-y-2">
+          <ul className="border-t border-line">
             {active.map((override) => (
               <li
                 key={override.id}
-                className="flex items-center justify-between gap-4 rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
+                className="flex items-start justify-between gap-4 border-b border-line py-3"
               >
-                <div>
-                  <code className="text-xs" style={{ color: "var(--muted)" }}>
-                    {override.entity}:{override.entityId}
-                  </code>
-                  <div>
-                    <strong>{override.field}</strong> ={" "}
-                    {JSON.stringify(override.value)}
-                  </div>
+                <div className="min-w-0 space-y-1">
+                  <p className="eyebrow">
+                    {override.entity} · {override.entityId}
+                  </p>
+                  <p className="text-[14px]">
+                    <strong className="font-medium">{override.field}</strong>
+                    <span className="mx-1.5 text-faint">=</span>
+                    <code>{JSON.stringify(override.value)}</code>
+                  </p>
                   {override.reason ? (
-                    <p className="text-xs" style={{ color: "var(--muted)" }}>{override.reason}</p>
+                    <p className="text-[12px] leading-relaxed text-muted">
+                      {override.reason}
+                    </p>
                   ) : null}
                 </div>
 
                 {unlocked && (
-                  <form action={removeOverride}>
+                  <form action={removeOverride} className="shrink-0">
                     <input type="hidden" name="entity" value={override.entity} />
                     <input
                       type="hidden"
@@ -243,19 +236,16 @@ export default async function OverridesPage() {
                       value={override.entityId}
                     />
                     <input type="hidden" name="field" value={override.field} />
-                    <button
-                      type="submit"
-                      className="text-xs text-red-600 underline dark:text-red-400"
-                    >
-                      quitar
-                    </button>
+                    <Button type="submit" variant="danger">
+                      Quitar
+                    </Button>
                   </form>
                 )}
               </li>
             ))}
           </ul>
         )}
-      </section>
-    </main>
+      </Section>
+    </Page>
   );
 }

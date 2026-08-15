@@ -1,71 +1,507 @@
 @import "tailwindcss";
 
-/**
- * Tokens de la interfaz.
+/* ==================================================================== *
+ * TIPOGRAFÍA
  *
- * Se definen aquí y no sueltos por las páginas para que cambiar el aspecto sea
- * tocar un sitio. Los nombres dicen para qué sirve cada color, no de qué color
- * es: `--surface` sobrevive a cambiar de gris a beige; `--neutral-100` no.
- */
-:root {
-  color-scheme: light dark;
+ * Las dos familias se sirven desde el propio dominio: ni una petición a
+ * terceros, ni un salto de fuente a media carga, ni una dependencia de
+ * red en el build.
+ *
+ * Archivo tiene eje de anchura, y aquí se usa de verdad: los titulares y
+ * las cifras van estrechados al 78-85%, como en una página de resultados
+ * impresa, donde el ancho de columna manda sobre el cuerpo de la letra.
+ *
+ * IBM Plex Mono se reserva a lo que tiene que alinearse o leerse como
+ * dato: columnas de dinero, rótulos y códigos.
+ * ==================================================================== */
 
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --border: #e4e4e7;
-  --text: #18181b;
-  --muted: #71717a;
-  --accent: #059669;
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-latin.woff2") format("woff2");
+  font-weight: 300 800;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
-  /* Estados. El mismo trío en toda la app: bien, ojo, mal. */
-  --good: #059669;
-  --warn: #b45309;
-  --bad: #dc2626;
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-latin-ext.woff2") format("woff2");
+  font-weight: 300 800;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plexmono-400-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plexmono-500-latin.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plexmono-600-latin.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ==================================================================== *
+ * TOKENS
+ *
+ * Papel y tinta. El tema claro es papel de periódico —cálido, nunca
+ * blanco de pantalla— con tinta casi negra; el oscuro es el mismo
+ * sistema al revés, con un negro de verde muy apagado.
+ *
+ * Aquí la superficie apenas se distingue del fondo **a propósito**: lo
+ * que separa las cosas son las reglas, no las cajas. Un producto de
+ * tablas no necesita treinta tarjetas flotando; necesita filetes.
+ *
+ * El acento existe pero se raciona: bandera de la sección activa, botón
+ * principal, la cifra que contesta la pregunta de la pantalla, y la
+ * banda de incertidumbre. Nada más. Un acento en todas partes es un
+ * acento en ninguna.
+ * ==================================================================== */
+
+@theme {
+  --font-sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-canvas: #f4f2ea;
+  --color-surface: #faf8f2;
+  --color-raised: #e9e6da;
+  --color-sunken: #e2dfd1;
+
+  --color-line: #d8d4c4;
+  --color-line-strong: #b4af9c;
+  /* La regla gruesa que abre cada sección. Es tinta, no gris. */
+  --color-rule: #1a1d19;
+
+  --color-ink: #141714;
+  --color-muted: #545c53;
+  --color-faint: #6f7669;
+
+  --color-brand: #c9f24b;
+  --color-on-brand: #101a08;
+  --color-brand-ink: #3a6210;
+  --color-band: #c2e75f;
+
+  --color-good: #0f7d58;
+  --color-warn: #8f5304;
+  --color-bad: #b62f22;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #09090b;
-    --surface: #18181b;
-    --surface-2: #27272a;
-    --border: #27272a;
-    --text: #fafafa;
-    --muted: #a1a1aa;
-    --accent: #34d399;
+  :root:not([data-theme="light"]) {
+    --color-canvas: #0b0d0c;
+    --color-surface: #101312;
+    --color-raised: #171b19;
+    --color-sunken: #060807;
 
-    --good: #34d399;
-    --warn: #fbbf24;
-    --bad: #f87171;
+    --color-line: #232725;
+    --color-line-strong: #3a413d;
+    --color-rule: #d8ded6;
+
+    --color-ink: #edefea;
+    --color-muted: #9ca69f;
+    --color-faint: #838d85;
+
+    --color-brand: #c9f24b;
+    --color-on-brand: #0b0d0c;
+    --color-brand-ink: #c9f24b;
+    --color-band: #4f6d23;
+
+    --color-good: #4ecf9a;
+    --color-warn: #e8ac3c;
+    --color-bad: #f9776a;
   }
 }
 
+:root[data-theme="dark"] {
+  --color-canvas: #0b0d0c;
+  --color-surface: #101312;
+  --color-raised: #171b19;
+  --color-sunken: #060807;
+
+  --color-line: #232725;
+  --color-line-strong: #3a413d;
+  --color-rule: #d8ded6;
+
+  --color-ink: #edefea;
+  --color-muted: #9ca69f;
+  --color-faint: #838d85;
+
+  --color-brand: #c9f24b;
+  --color-on-brand: #0b0d0c;
+  --color-brand-ink: #c9f24b;
+  --color-band: #4f6d23;
+
+  --color-good: #4ecf9a;
+  --color-warn: #e8ac3c;
+  --color-bad: #f9776a;
+}
+
+/* ==================================================================== *
+ * BASE
+ * ==================================================================== */
+
+html {
+  color-scheme: light dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 body {
-  background: var(--bg);
-  color: var(--text);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-synthesis-weight: none;
   @apply antialiased;
 }
 
-/* Números en columnas que cuadran: dinero, puntos, probabilidades. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-brand) 40%, transparent);
+  color: var(--color-ink);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* ==================================================================== *
+ * VOCES TIPOGRÁFICAS
+ * ==================================================================== */
+
+/**
+ * Titular. Estrechado y muy apretado, como un rótulo de portada. El
+ * `clamp` lo deja crecer con la pantalla sin puntos de ruptura: en un
+ * móvil es un titular, en un monitor es una cabecera de periódico.
+ */
+.display {
+  font-stretch: 80%;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 0.94;
+  font-size: clamp(2.25rem, 1.4rem + 3.4vw, 3.75rem);
+}
+
+/**
+ * Rótulo de sección: la línea de texto que se apoya sobre la regla
+ * gruesa. Estrecho, en versalitas y con peso, como el nombre de una
+ * sección en una página de resultados.
+ */
+.slug {
+  font-stretch: 82%;
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+/**
+ * Etiqueta de instrumento: mono, versalitas, muy espaciada. Es la voz
+ * con la que la app nombra los datos, y por eso no se usa para nada más.
+ */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/** Cifras que tienen que cuadrar en columna: dinero, puntos, porcentajes. */
 .nums {
   font-variant-numeric: tabular-nums;
 }
 
 /**
- * Las tablas anchas se desplazan dentro de su caja, nunca empujan la página.
- * En un móvil de 375px una tabla de siete columnas rompe el layout entero si
- * no se contiene aquí.
+ * Cifra de marcador. El eje de anchura se estrecha para que un número
+ * largo siga cabiendo sin encoger el cuerpo, que es como se resuelve en
+ * un panel de estadio y no en una hoja de cálculo.
+ */
+.scoreline {
+  font-variant-numeric: tabular-nums;
+  font-stretch: 78%;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 0.95;
+}
+
+/** La unidad acompaña a la cifra, no compite con ella. */
+.unit {
+  font-family: var(--font-mono);
+  font-size: 0.62em;
+  font-weight: 500;
+  color: var(--color-faint);
+  letter-spacing: 0.02em;
+}
+
+/* ==================================================================== *
+ * REGLAS
+ *
+ * El sistema entero se sostiene sobre dos filetes: uno grueso de tinta
+ * que abre sección, y uno fino que separa filas. No hay sombras ni
+ * cajas flotantes en ninguna parte.
+ * ==================================================================== */
+
+/**
+ * La regla gruesa no es un borde sino una barra propia, y es por el
+ * movimiento: un `border-top` no se puede dibujar, y una barra sí. Al
+ * entrar, cada regla se traza de izquierda a derecha, que es el gesto de
+ * entintar una página.
+ */
+.rule-heavy {
+  position: relative;
+}
+.rule-heavy::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  background: var(--color-rule);
+  transform-origin: left center;
+  animation: draw 560ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.rule {
+  border-top: 1px solid var(--color-line);
+}
+
+/**
+ * Cuadratín de sección: el cuadradito de acento que se apoya en el
+ * extremo izquierdo de la regla gruesa. Es la única firma recurrente de
+ * la interfaz, y entra un poco después que la regla para que se vea que
+ * se posa encima.
+ */
+.quad::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 22px;
+  height: 2px;
+  background: var(--color-brand);
+  transform-origin: left center;
+  animation: draw 320ms cubic-bezier(0.22, 0.61, 0.36, 1) 240ms both;
+}
+
+/* ==================================================================== *
+ * UTILIDADES
+ * ==================================================================== */
+
+/**
+ * Las tablas anchas se desplazan dentro de su caja, nunca empujan la
+ * página. En un móvil de 375px una tabla de siete columnas rompe el
+ * layout entero si no se contiene aquí.
  */
 .table-scroll {
-  @apply -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0;
+  @apply overflow-x-auto;
+  overscroll-behavior-x: contain;
+}
+
+/** Área táctil mínima cómoda en móvil. */
+.tap {
+  min-height: 44px;
+}
+
+/** Pulsación con respuesta física: sin esto los botones parecen imágenes. */
+.press {
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.press:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 code {
-  @apply rounded px-1 py-0.5 text-[0.9em];
-  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 0.1em 0.3em;
+  background: var(--color-raised);
+  color: var(--color-ink);
 }
 
-/* Área táctil mínima cómoda en móvil. */
-.tap {
-  min-height: 44px;
+/**
+ * El `<details>` nativo trae un triángulo que no combina con nada. Se
+ * quita aquí una vez en lugar de en cada uso.
+ */
+summary {
+  list-style: none;
+  cursor: pointer;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+
+/** Carga: un latido lento, no un destello. */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.22;
+  }
+}
+.skeleton {
+  background: var(--color-raised);
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+
+/* ==================================================================== *
+ * MOVIMIENTO
+ *
+ * Tres gestos y ninguno más, todos tomados de lo que hace la app:
+ *
+ * - **Trazar**: las reglas y las barras se dibujan de izquierda a
+ *   derecha. Es entintar.
+ * - **Subir**: los bloques entran desde seis píxeles más abajo. Es pasar
+ *   la página.
+ * - **Medir**: las bandas de incertidumbre crecen desde su mínimo hasta
+ *   su máximo, que es literalmente lo que significan.
+ *
+ * Nada rebota, nada gira, ninguna cifra cuenta hacia arriba. Esto se usa
+ * para decidir con dinero: un número que se está animando es un número
+ * que todavía no se puede leer.
+ *
+ * Todo va en CSS y sin una línea de JavaScript, así que corre en el
+ * primer pintado y no espera a hidratar.
+ * ==================================================================== */
+
+@keyframes draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/**
+ * Los bloques de primer nivel de cada pantalla entran escalonados. El
+ * escalón es corto —45ms— porque no es un espectáculo: es un orden de
+ * lectura sugerido durante medio segundo.
+ */
+main > * {
+  animation: rise 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+main > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+main > *:nth-child(2) {
+  animation-delay: 45ms;
+}
+main > *:nth-child(3) {
+  animation-delay: 90ms;
+}
+main > *:nth-child(4) {
+  animation-delay: 135ms;
+}
+main > *:nth-child(5) {
+  animation-delay: 180ms;
+}
+main > *:nth-child(n + 6) {
+  animation-delay: 225ms;
+}
+
+/** Lo que se despliega baja desde arriba, como si se descolgara. */
+details[open] > *:not(summary) {
+  animation: drop 240ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/** Una fila sobre la que se puede pulsar tiene que responder al ratón. */
+.row-link {
+  transition:
+    background-color 140ms ease,
+    padding-left 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.row-link:hover {
+  background: var(--color-surface);
+}
+.row-link .row-arrow,
+.row-link .row-arrow-back {
+  transition: transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.row-link:hover .row-arrow {
+  transform: translateX(3px);
+}
+.row-link:hover .row-arrow-back {
+  transform: translateX(-3px);
+}
+
+tbody tr {
+  transition: background-color 140ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
