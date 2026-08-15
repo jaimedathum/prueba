@@ -6,7 +6,6 @@ import {
   Empty,
   Figure,
   Lede,
-  Notice,
   Output,
   Page,
   RangeBar,
@@ -84,17 +83,6 @@ export default async function RiesgoPage() {
           hint="Contando ya lo que le pondrías en la caja a su dueño."
         />
       </div>
-
-      <Notice
-        tone={data.calibration.applied ? "good" : "neutral"}
-        title="Calibración del modelo"
-      >
-        <p>{data.calibration.note}</p>
-        <p className="mt-1.5 text-faint">
-          Tu saldo es el único visible, así que es el patrón contra el que se
-          mide el modelo. Si no clava el tuyo, no acierta el de nadie.
-        </p>
-      </Notice>
 
       {/* --- Caja de los rivales ------------------------------------ */}
       <Section
@@ -267,7 +255,12 @@ export default async function RiesgoPage() {
         )}
       </Section>
 
-      <footer className="rule pt-4 text-[12px] leading-relaxed text-faint">
+      <footer className="rule space-y-1.5 pt-4 text-[12px] leading-relaxed text-faint">
+        <p>
+          Calibración: {data.calibration.note} Tu saldo es el único visible, así
+          que es el patrón contra el que se mide el modelo: si no clava el tuyo,
+          no acierta el de nadie.
+        </p>
         <p>
           Valoración provisional: coste de reposición ={" "}
           {data.priors.bidTypical.toFixed(2)}× el valor de mercado, aprendido de{" "}

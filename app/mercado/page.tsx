@@ -8,7 +8,7 @@ import {
   Disclosure,
   Empty,
   Figure,
-  Notice,
+  ModelWarnings,
   Page,
   RiskBar,
   Section,
@@ -76,16 +76,6 @@ export default async function MercadoPage() {
         },
       ]}
     >
-      {data.warnings.length > 0 ? (
-        <Notice title="Lo que hay que tener en cuenta">
-          <ul className="list-disc space-y-1 pl-4 marker:text-faint">
-            {data.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </Notice>
-      ) : null}
-
       {/* --- Movimientos ------------------------------------------- */}
       <Section
         title="Movimiento recomendado"
@@ -303,23 +293,28 @@ export default async function MercadoPage() {
         )}
       </Section>
 
-      {data.validation ? (
-        <footer className="rule space-y-1.5 pt-4 text-[12px] leading-relaxed text-faint">
-          <p>
-            Modelo de precios validado con separación temporal:{" "}
-            {data.validation.trainSamples} muestras de entrenamiento,{" "}
-            {data.validation.testSamples} de prueba.{" "}
-            {data.validation.skill > 0
-              ? `Bate a la línea base "mañana vale lo mismo que hoy" en un ${(data.validation.skill * 100).toFixed(1)}%.`
-              : "NO bate a la línea base: no conviene fiarse de él todavía."}
-          </p>
-          <p>
-            Cobertura del cuantil 90:{" "}
-            {((data.validation.calibration.get(0.9) ?? 0) * 100).toFixed(0)}%
-            (debería rondar el 90% si está bien calibrado).
-          </p>
+      {(data.validation || data.warnings.length > 0) && (
+        <footer className="rule space-y-2 pt-4 text-[12px] leading-relaxed text-faint">
+          {data.validation ? (
+            <>
+              <p>
+                Modelo de precios validado con separación temporal:{" "}
+                {data.validation.trainSamples} muestras de entrenamiento,{" "}
+                {data.validation.testSamples} de prueba.{" "}
+                {data.validation.skill > 0
+                  ? `Bate a la línea base "mañana vale lo mismo que hoy" en un ${(data.validation.skill * 100).toFixed(1)}%.`
+                  : "NO bate a la línea base: no conviene fiarse de él todavía."}
+              </p>
+              <p>
+                Cobertura del cuantil 90:{" "}
+                {((data.validation.calibration.get(0.9) ?? 0) * 100).toFixed(0)}%
+                (debería rondar el 90% si está bien calibrado).
+              </p>
+            </>
+          ) : null}
+          <ModelWarnings warnings={data.warnings} />
         </footer>
-      ) : null}
+      )}
     </Page>
   );
 }

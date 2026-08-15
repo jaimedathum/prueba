@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/queries";
 import { SetupNotice } from "../setup-notice";
-import { Empty, Notice, Page, RangeBar, Section, Table, Td, Th } from "../ui";
+import {
+  Empty,
+  ModelWarnings,
+  Page,
+  RangeBar,
+  Section,
+  Table,
+  Td,
+  Th,
+} from "../ui";
 import { getLeague } from "./data";
 
 export const dynamic = "force-dynamic";
@@ -60,16 +69,6 @@ export default async function RivalesPage() {
         { label: "Próxima jornada", value: nextMatchday ?? "—" },
       ]}
     >
-      {warnings.length > 0 && (
-        <Notice title="Lo que hay que tener en cuenta">
-          <ul className="list-disc space-y-1 pl-4 marker:text-faint">
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </Notice>
-      )}
-
       <Section
         title={
           nextMatchday
@@ -226,6 +225,12 @@ export default async function RivalesPage() {
             ))}
           </ul>
         </Section>
+      )}
+
+      {warnings.length > 0 && (
+        <footer className="rule pt-4 text-[12px] leading-relaxed text-faint">
+          <ModelWarnings warnings={warnings} />
+        </footer>
       )}
     </Page>
   );

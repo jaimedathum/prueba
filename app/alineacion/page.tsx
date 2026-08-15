@@ -6,7 +6,7 @@ import {
   Empty,
   Figure,
   Lede,
-  Notice,
+  ModelWarnings,
   Page,
   Row,
   Section,
@@ -68,16 +68,6 @@ export default async function AlineacionPage() {
         },
       ]}
     >
-      {warnings.length > 0 ? (
-        <Notice title="Lo que falta y qué se pierde por ello">
-          <ul className="list-disc space-y-1 pl-4 marker:text-faint">
-            {warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </Notice>
-      ) : null}
-
       {!lineup ? (
         <Empty>
           No hay jugadores suficientes para formar un once con las formaciones
@@ -208,12 +198,13 @@ export default async function AlineacionPage() {
         </>
       )}
 
-      <footer className="rule pt-4 text-[12px] leading-relaxed text-faint">
+      <footer className="rule space-y-2 pt-4 text-[12px] leading-relaxed text-faint">
         <p>
           Ventaja de jugar en casa estimada: ×
           {Math.exp(model.homeAdvantage).toFixed(2)} en goles esperados.
           Corrección de marcadores bajos ρ = {model.rho.toFixed(3)}.
         </p>
+        <ModelWarnings warnings={warnings} />
       </footer>
     </Page>
   );

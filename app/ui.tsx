@@ -389,6 +389,32 @@ export function Notice({
 }
 
 /**
+ * Lo que el modelo no sabe, al pie de la pantalla y plegado.
+ *
+ * Estos avisos existen porque la app enseña sus lagunas en vez de
+ * taparlas, y eso no se toca. Lo que se ha movido es **dónde**: un bloque
+ * de "esto te falta" abriendo cada pantalla se lee dos veces y a la
+ * tercera se ignora, y mientras tanto le está robando el primer golpe de
+ * vista a la recomendación, que es a lo que se viene. Al pie, con la
+ * cuenta a la vista y a un clic, sigue estando sin estorbar.
+ */
+export function ModelWarnings({ warnings }: { warnings: string[] }) {
+  if (warnings.length === 0) return null;
+
+  return (
+    <Disclosure
+      summary={`${warnings.length} ${warnings.length === 1 ? "aviso" : "avisos"} sobre lo que el modelo no sabe`}
+    >
+      <ul className="list-disc space-y-1 pl-4 marker:text-faint">
+        {warnings.map((warning) => (
+          <li key={warning}>{warning}</li>
+        ))}
+      </ul>
+    </Disclosure>
+  );
+}
+
+/**
  * Escala de riesgo de 1 a 6.
  *
  * Barra en vez de números sueltos porque lo que importa es comparar de un

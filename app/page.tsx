@@ -60,6 +60,9 @@ export default async function Home() {
               : "sin dato",
         },
         { label: "Valor plantilla", value: formatMoney(valorTotal) },
+        // El dato que antes ocupaba un bloque de aviso entero cabe aquí,
+        // que es donde se miran los números de la pantalla.
+        { label: "Cláusula bajo valor", value: enRiesgo },
         {
           label: "Última lectura",
           value: lastSync
@@ -76,17 +79,6 @@ export default async function Home() {
       {lastSync?.status === "failed" && (
         <Notice tone="bad" title="La última sincronización falló">
           {lastSync.error ?? "Sin detalle del error."}
-        </Notice>
-      )}
-
-      {enRiesgo > 0 && (
-        <Notice title={`${enRiesgo} por debajo de su valor`}>
-          Esos jugadores le salen baratos a cualquiera que tenga caja. Lo que
-          hay que hacer con cada uno está en{" "}
-          <a className="underline underline-offset-2" href="/riesgo">
-            riesgo y cláusulas
-          </a>
-          .
         </Notice>
       )}
 
