@@ -12,7 +12,6 @@ import {
   Input,
   Notice,
   Page,
-  Panel,
   Section,
   Select,
 } from "../ui";
@@ -151,53 +150,51 @@ export default async function OverridesPage() {
           title="Nueva corrección"
           hint="El valor se interpreta como JSON si puede; si no, se guarda tal cual. Así se corrigen números, booleanos y textos con el mismo campo."
         >
-          <Panel>
-            <form action={saveOverride} className="grid gap-4 sm:grid-cols-2">
-              <Field label="Entidad">
-                <Select name="entity">
-                  {ENTITIES.map((entity) => (
-                    <option key={entity} value={entity}>
-                      {entity}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+          <form action={saveOverride} className="grid max-w-3xl gap-5 sm:grid-cols-2">
+            <Field label="Entidad">
+              <Select name="entity">
+                {ENTITIES.map((entity) => (
+                  <option key={entity} value={entity}>
+                    {entity}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
-              <Field label="Id">
-                <Input
-                  name="entityId"
-                  required
-                  placeholder="id del jugador, manager…"
-                />
-              </Field>
+            <Field label="Id">
+              <Input
+                name="entityId"
+                required
+                placeholder="id del jugador, manager…"
+              />
+            </Field>
 
-              <Field label="Campo">
-                <Input
-                  name="field"
-                  required
-                  placeholder="marketValue, buyoutClause, status…"
-                />
-              </Field>
+            <Field label="Campo">
+              <Input
+                name="field"
+                required
+                placeholder="marketValue, buyoutClause, status…"
+              />
+            </Field>
 
-              <Field label="Valor">
-                <Input name="value" required placeholder='12000000  o  "injured"' />
-              </Field>
+            <Field label="Valor">
+              <Input name="value" required placeholder='12000000  o  "injured"' />
+            </Field>
 
-              <Field
-                label="Motivo"
-                hint="Opcional, pero tu yo de dentro de un mes lo agradecerá."
-                className="sm:col-span-2"
-              >
-                <Input name="reason" placeholder="Por qué no vale el dato de la API" />
-              </Field>
+            <Field
+              label="Motivo"
+              hint="Opcional, pero tu yo de dentro de un mes lo agradecerá."
+              className="sm:col-span-2"
+            >
+              <Input name="reason" placeholder="Por qué no vale el dato de la API" />
+            </Field>
 
-              <div className="sm:col-span-2">
-                <Button type="submit" variant="primary">
-                  Guardar corrección
-                </Button>
-              </div>
-            </form>
-          </Panel>
+            <div className="sm:col-span-2">
+              <Button type="submit" variant="primary">
+                Guardar corrección
+              </Button>
+            </div>
+          </form>
         </Section>
       )}
 
@@ -208,12 +205,11 @@ export default async function OverridesPage() {
             la API.
           </Empty>
         ) : (
-          <ul className="space-y-2">
+          <ul className="border-t border-line">
             {active.map((override) => (
-              <Panel
+              <li
                 key={override.id}
-                as="li"
-                className="flex items-start justify-between gap-4"
+                className="flex items-start justify-between gap-4 border-b border-line py-3"
               >
                 <div className="min-w-0 space-y-1">
                   <p className="eyebrow">
@@ -245,7 +241,7 @@ export default async function OverridesPage() {
                     </Button>
                   </form>
                 )}
-              </Panel>
+              </li>
             ))}
           </ul>
         )}

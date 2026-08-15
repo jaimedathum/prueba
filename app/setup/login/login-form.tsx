@@ -7,7 +7,6 @@ import {
   Field,
   Input,
   Output,
-  Panel,
 } from "../../ui";
 import {
   completeInteractiveLogin,
@@ -37,7 +36,7 @@ export function InteractiveLogin() {
   );
 
   return (
-    <Panel className="space-y-4">
+    <section className="rule-heavy space-y-4 pt-3">
       <Cabecera
         title="Cuenta de Google, Apple o Facebook"
         hint="También sirve para cuentas de email y contraseña. Si no sabes cuál tienes, empieza por aquí."
@@ -55,7 +54,7 @@ export function InteractiveLogin() {
       {start && !start.ok && <Output tone="warn">{start.message}</Output>}
 
       {start?.authorizeUrl && (
-        <div className="space-y-3 rounded-control border border-line bg-raised p-3.5">
+        <div className="space-y-3 border border-line bg-raised p-3.5">
           <ButtonLink
             href={start.authorizeUrl}
             target="_blank"
@@ -98,7 +97,7 @@ export function InteractiveLogin() {
       )}
 
       {done && <Output tone={done.ok ? "good" : "warn"}>{done.message}</Output>}
-    </Panel>
+    </section>
   );
 }
 
@@ -109,7 +108,7 @@ export function PasswordLogin() {
   );
 
   return (
-    <Panel className="space-y-4">
+    <section className="rule-heavy space-y-4 pt-3">
       <Cabecera
         title="Cuenta de email y contraseña"
         hint={
@@ -143,7 +142,7 @@ export function PasswordLogin() {
       {state && (
         <Output tone={state.ok ? "good" : "warn"}>{state.message}</Output>
       )}
-    </Panel>
+    </section>
   );
 }
 
@@ -156,7 +155,7 @@ function Cabecera({
 }) {
   return (
     <div className="space-y-1">
-      <h2 className="text-[15px] font-semibold tracking-[-0.01em]">{title}</h2>
+      <h2 className="slug text-ink">{title}</h2>
       <p className="text-[13px] leading-relaxed text-muted">{hint}</p>
     </div>
   );

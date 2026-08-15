@@ -5,14 +5,12 @@ import {
   Badge,
   Empty,
   Figure,
+  Lede,
   Notice,
   Output,
   Page,
-  Panel,
   RangeBar,
   Section,
-  Stat,
-  StatGrid,
   Table,
   Td,
   Th,
@@ -59,40 +57,33 @@ export default async function RiesgoPage() {
   // Todas las bandas contra el mismo techo: si cada una se escalara sola,
   // comparar dos barras no significaría nada.
   const scale = Math.max(1, ...rivals.map((band) => band.max));
-  const aBlindar = data.shields.filter(
-    (shield) => shield.verdict === "shield",
-  ).length;
-  const rentables = data.attacks.filter(
-    (attack) => attack.verdict === "attack",
-  ).length;
+  const aBlindar = data.shields.filter((s) => s.verdict === "shield").length;
+  const rentables = data.attacks.filter((a) => a.verdict === "attack").length;
 
   return (
     <Page
       eyebrow="Decidir"
       title="Riesgo y cláusulas"
-      subtitle="Quién puede pagar qué, a quién te conviene blindar, y a quién te sale a cuenta clausular."
+      subtitle="Quién puede pagar qué, a quién te conviene blindar, y a quién te sale a cuenta clausular. El mínimo de cada banda es el número que importa para defenderse: es lo que un rival puede pagar con seguridad."
+      meta={[
+        { label: "Tu caja", value: formatMoney(data.myCash) },
+        { label: "Horizonte", value: `${data.horizonDays} días` },
+        { label: "Histórico", value: `${data.observedDays} días` },
+      ]}
     >
-      <Panel>
-        <StatGrid>
-          <Stat label="Tu caja" value={formatMoney(data.myCash)} />
-          <Stat
-            label="Horizonte"
-            value={data.horizonDays}
-            hint="días de la ventana"
-          />
-          <Stat
-            label="Histórico"
-            value={data.observedDays}
-            hint="días observados"
-          />
-          <Stat
-            label="A blindar"
-            value={aBlindar}
-            tone={aBlindar > 0 ? "warn" : "good"}
-            hint={rentables > 0 ? `${rentables} clausulazos rentables` : undefined}
-          />
-        </StatGrid>
-      </Panel>
+      <div className="flex flex-wrap items-start gap-x-14 gap-y-6">
+        <Lede
+          label="Jugadores tuyos a blindar"
+          value={aBlindar}
+          hint="Los que pierdes más de lo que cuesta protegerlos."
+          accent={aBlindar > 0}
+        />
+        <Lede
+          label="Clausulazos rentables"
+          value={rentables}
+          hint="Contando ya lo que le pondrías en la caja a su dueño."
+        />
+      </div>
 
       <Notice
         tone={data.calibration.applied ? "good" : "warn"}
@@ -108,7 +99,8 @@ export default async function RiesgoPage() {
       {/* --- Caja de los rivales ------------------------------------ */}
       <Section
         title="Caja estimada de los rivales"
-        hint="El mínimo es el número que importa para defenderse: es lo que un rival puede pagar con seguridad. La anchura de la banda mide lo que no se sabe, no un margen de error inventado."
+        aside={`${rivals.length} managers`}
+        hint="La anchura de la banda mide lo que no se sabe, no un margen de error inventado."
       >
         {rivals.length === 0 ? (
           <Empty>
@@ -116,60 +108,58 @@ export default async function RiesgoPage() {
             caja.
           </Empty>
         ) : (
-          <Panel>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Manager</Th>
-                  <Th className="w-full min-w-[9rem]">Banda</Th>
-                  <Th align="right">Mínimo</Th>
-                  <Th align="right">Estimado</Th>
-                  <Th align="right">Máximo</Th>
-                  <Th align="right">Confianza</Th>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Manager</Th>
+                <Th className="w-full min-w-[9rem]">Banda</Th>
+                <Th align="right">Mínimo</Th>
+                <Th align="right">Estimado</Th>
+                <Th align="right">Máximo</Th>
+                <Th align="right">Confianza</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rivals.map((band) => (
+                <tr key={band.managerId}>
+                  <Td className="whitespace-nowrap font-medium">
+                    {data.managerNames.get(band.managerId) ?? band.managerId}
+                  </Td>
+                  <Td className="min-w-[9rem]">
+                    <RangeBar
+                      min={band.min}
+                      point={band.point}
+                      max={band.max}
+                      scaleMax={scale}
+                      format={formatMoney}
+                    />
+                  </Td>
+                  <Td align="right" numeric className="text-faint">
+                    {formatMoney(band.min)}
+                  </Td>
+                  <Td align="right" numeric className="font-medium">
+                    {formatMoney(band.point)}
+                  </Td>
+                  <Td align="right" numeric className="text-faint">
+                    {formatMoney(band.max)}
+                  </Td>
+                  <Td align="right">
+                    <span className="inline-flex flex-col items-end gap-1">
+                      <Confidence level={band.confidence} />
+                      {band.uncertainEvents > 0 ? (
+                        <span
+                          className="whitespace-nowrap font-mono text-[10px] text-faint"
+                          title={`${band.uncertainEvents} de ${band.totalEvents} eventos sin importe conocido`}
+                        >
+                          {band.uncertainEvents} sin importe
+                        </span>
+                      ) : null}
+                    </span>
+                  </Td>
                 </tr>
-              </thead>
-              <tbody>
-                {rivals.map((band) => (
-                  <tr key={band.managerId}>
-                    <Td className="whitespace-nowrap font-medium">
-                      {data.managerNames.get(band.managerId) ?? band.managerId}
-                    </Td>
-                    <Td className="min-w-[9rem]">
-                      <RangeBar
-                        min={band.min}
-                        point={band.point}
-                        max={band.max}
-                        scaleMax={scale}
-                        format={formatMoney}
-                      />
-                    </Td>
-                    <Td align="right" numeric className="text-faint">
-                      {formatMoney(band.min)}
-                    </Td>
-                    <Td align="right" numeric className="font-medium">
-                      {formatMoney(band.point)}
-                    </Td>
-                    <Td align="right" numeric className="text-faint">
-                      {formatMoney(band.max)}
-                    </Td>
-                    <Td align="right">
-                      <span className="inline-flex flex-col items-end gap-1">
-                        <Confidence level={band.confidence} />
-                        {band.uncertainEvents > 0 ? (
-                          <span
-                            className="whitespace-nowrap font-mono text-[10px] text-faint"
-                            title={`${band.uncertainEvents} de ${band.totalEvents} eventos sin importe conocido`}
-                          >
-                            {band.uncertainEvents} sin importe
-                          </span>
-                        ) : null}
-                      </span>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Panel>
+              ))}
+            </tbody>
+          </Table>
         )}
       </Section>
 
@@ -184,22 +174,19 @@ export default async function RiesgoPage() {
         ) : (
           <>
             {data.shieldPlan && data.shieldPlan.actions.length > 0 ? (
-              <Panel tone="brand">
-                <p className="eyebrow mb-1.5">Plan recomendado</p>
-                <p className="text-[14px] leading-relaxed">
-                  Invertir{" "}
-                  <Figure tone="brand" className="text-[15px]">
-                    {formatMoney(data.shieldPlan.totalInvestment)}
-                  </Figure>{" "}
-                  en {data.shieldPlan.actions.length} blindaje
-                  {data.shieldPlan.actions.length > 1 ? "s" : ""}, con un
-                  beneficio esperado de{" "}
-                  <Figure tone="brand" className="text-[15px]">
-                    {formatMoney(data.shieldPlan.totalExpectedGain)}
-                  </Figure>
-                  .
-                </p>
-              </Panel>
+              <p className="max-w-3xl text-[17px] leading-snug sm:text-[19px]">
+                Invertir{" "}
+                <strong className="scoreline text-brand-ink">
+                  {formatMoney(data.shieldPlan.totalInvestment)}
+                </strong>{" "}
+                en {data.shieldPlan.actions.length} blindaje
+                {data.shieldPlan.actions.length > 1 ? "s" : ""} tiene un
+                beneficio esperado de{" "}
+                <strong className="scoreline">
+                  {formatMoney(data.shieldPlan.totalExpectedGain)}
+                </strong>
+                .
+              </p>
             ) : null}
 
             {data.shields.length === 0 ? (
@@ -208,25 +195,28 @@ export default async function RiesgoPage() {
                 blindarlo.
               </Empty>
             ) : (
-              <ul className="grid gap-3 lg:grid-cols-2">
+              <ul className="border-t border-line">
                 {data.shields.map((shield) => (
-                  <Panel key={shield.playerId} as="li">
+                  <li
+                    key={shield.playerId}
+                    className="border-b border-line py-3"
+                  >
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <strong className="text-[14px] font-semibold">
+                      <strong className="text-[15px] font-semibold">
                         {shield.name}
                       </strong>
-                      <span className="flex items-center gap-2">
-                        <Verdict verdict={shield.verdict} />
+                      <span className="flex items-center gap-2.5">
                         <Figure className="text-[12px] text-faint">
                           {(shield.currentRisk * 100).toFixed(1)}
                           <span className="unit">%</span>
                         </Figure>
+                        <Verdict verdict={shield.verdict} />
                       </span>
                     </div>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+                    <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-muted">
                       {shield.reason}
                     </p>
-                  </Panel>
+                  </li>
                 ))}
               </ul>
             )}
@@ -246,38 +236,38 @@ export default async function RiesgoPage() {
             sus cláusulas y su caja.
           </Empty>
         ) : (
-          <ul className="grid gap-3 lg:grid-cols-2">
+          <ul className="border-t border-line">
             {data.attacks.map((attack) => (
-              <Panel key={attack.playerId} as="li">
+              <li key={attack.playerId} className="border-b border-line py-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <strong className="text-[14px] font-semibold">
+                  <strong className="text-[15px] font-semibold">
                     {attack.name}
                   </strong>
-                  <span className="flex items-center gap-2">
-                    <AttackBadge verdict={attack.verdict} />
+                  <span className="flex items-center gap-2.5">
                     <Figure className="text-[12px]">
                       {formatMoney(attack.clause)}
                     </Figure>
+                    <AttackBadge verdict={attack.verdict} />
                   </span>
                 </div>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+                <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-muted">
                   {attack.reason}
                 </p>
                 {attack.fundingHarm > 0 ? (
-                  <p className="mt-2 border-t border-line pt-2 text-[12px] leading-relaxed text-warn">
+                  <p className="mt-1 text-[12px] leading-relaxed text-warn">
                     Le pondrías {formatMoney(attack.clause)} en la caja a{" "}
                     {data.managerNames.get(attack.ownerManagerId) ??
                       attack.ownerManagerId}
                     .
                   </p>
                 ) : null}
-              </Panel>
+              </li>
             ))}
           </ul>
         )}
       </Section>
 
-      <footer className="border-t border-line pt-5 text-[12px] leading-relaxed text-faint">
+      <footer className="rule pt-4 text-[12px] leading-relaxed text-faint">
         <p>
           Valoración provisional: coste de reposición ={" "}
           {data.priors.bidTypical.toFixed(2)}× el valor de mercado, aprendido de{" "}

@@ -7,24 +7,18 @@ import { Mark } from "./nav";
  */
 export default function NotFound() {
   return (
-    <main className="mx-auto max-w-md space-y-6 py-16 text-center">
-      <div className="flex justify-center">
-        <Mark size={40} />
-      </div>
-      <div className="space-y-2">
+    <main className="max-w-lg space-y-6 py-10">
+      <Mark size={32} />
+      <div>
         <p className="eyebrow">Error 404</p>
-        <h1 className="text-2xl font-semibold tracking-[-0.025em]">
-          Esta página no existe
-        </h1>
-        <p className="text-[13px] leading-relaxed text-muted">
-          O la dirección está mal escrita, o apuntaba a algo que ya no está.
-        </p>
+        <h1 className="display mt-2">Esta página no existe</h1>
       </div>
-      <div className="flex justify-center">
-        <ButtonLink href="/" variant="primary">
-          Volver a mi plantilla
-        </ButtonLink>
-      </div>
+      <p className="rule-heavy pt-3 text-[13.5px] leading-relaxed text-muted">
+        O la dirección está mal escrita, o apuntaba a algo que ya no está.
+      </p>
+      <ButtonLink href="/" variant="primary">
+        Volver a mi plantilla
+      </ButtonLink>
     </main>
   );
 }

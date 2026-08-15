@@ -9,7 +9,6 @@ import {
   Figure,
   Notice,
   Page,
-  Panel,
   RangeBar,
   Row,
   Section,
@@ -57,14 +56,18 @@ export default async function RivalesPage() {
   const { rivals, standings, nextMatchday, warnings } = data;
 
   // Todas las bandas se dibujan contra el mismo techo; si no, una barra
-  // llena querría decir cosas distintas en cada tarjeta.
+  // llena querría decir cosas distintas en cada ficha.
   const cashScale = Math.max(1, ...rivals.map((rival) => rival.cash.max));
 
   return (
     <Page
       eyebrow="La liga"
       title="Rivales"
-      subtitle={`${rivals.length} equipos además del tuyo, ordenados por la caja que se les estima.`}
+      subtitle="La caja de cada rival es una banda, no una cifra: se reconstruye movimiento a movimiento desde el feed de actividad, y cuando un movimiento no expone su importe la banda se ensancha en vez de inventarse un número."
+      meta={[
+        { label: "Equipos", value: rivals.length },
+        { label: "Próxima jornada", value: nextMatchday ?? "—" },
+      ]}
     >
       {warnings.length > 0 && (
         <Notice title="Lo que hay que tener en cuenta">
@@ -78,82 +81,72 @@ export default async function RivalesPage() {
 
       <Section
         title={
-          nextMatchday
-            ? `Proyección desde la jornada ${nextMatchday}`
-            : "Proyección de la liga"
+          nextMatchday ? `Proyección desde la jornada ${nextMatchday}` : "Proyección"
         }
-        hint="Puntos actuales más el mejor once repetido. A una jornada es una estimación; a diez, una tendencia."
+        hint="Puntos actuales más el mejor once repetido. La proyección supone que la plantilla no cambia y que todos alinean bien: a diez jornadas esto ordena, no predice."
       >
-        <Panel>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Equipo</Th>
-                <Th align="right">Hoy</Th>
-                <Th align="right">/jor</Th>
-                {standings[0]?.projections.map((p) => (
-                  <Th key={p.matchdays} align="right">
-                    +{p.matchdays}
-                  </Th>
+        <Table>
+          <thead>
+            <tr>
+              <Th>Equipo</Th>
+              <Th align="right">Hoy</Th>
+              <Th align="right">/jor</Th>
+              {standings[0]?.projections.map((p) => (
+                <Th key={p.matchdays} align="right">
+                  +{p.matchdays}
+                </Th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {standings.map((row, index) => (
+              <tr key={row.managerId}>
+                <Td className="whitespace-nowrap">
+                  <span className="flex items-center gap-2.5">
+                    <span
+                      aria-hidden
+                      className="h-3.5 w-[3px] shrink-0"
+                      style={{
+                        background: row.isMe
+                          ? "var(--color-brand)"
+                          : "transparent",
+                      }}
+                    />
+                    <span className="nums font-mono text-[11px] text-faint">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className={row.isMe ? "font-semibold" : ""}>
+                      {row.teamName}
+                    </span>
+                  </span>
+                </Td>
+                <Td align="right" numeric>
+                  {row.currentPoints ?? "—"}
+                </Td>
+                <Td align="right" numeric className="text-faint">
+                  {row.perMatchday.toFixed(1)}
+                </Td>
+                {row.projections.map((p) => (
+                  <Td
+                    key={p.matchdays}
+                    align="right"
+                    numeric
+                    className={row.isMe ? "font-semibold" : undefined}
+                  >
+                    {p.points.toFixed(0)}
+                  </Td>
                 ))}
               </tr>
-            </thead>
-            <tbody>
-              {standings.map((row, index) => (
-                <tr key={row.managerId}>
-                  <Td className="whitespace-nowrap">
-                    <span className="inline-flex items-baseline gap-2">
-                      <span
-                        aria-hidden
-                        className="inline-block w-[3px] self-stretch rounded"
-                        style={{
-                          background: row.isMe
-                            ? "var(--color-brand)"
-                            : "transparent",
-                        }}
-                      />
-                      <span className="nums font-mono text-[11px] text-faint">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <span className={row.isMe ? "font-semibold" : ""}>
-                        {row.teamName}
-                      </span>
-                    </span>
-                  </Td>
-                  <Td align="right" numeric>
-                    {row.currentPoints ?? "—"}
-                  </Td>
-                  <Td align="right" numeric className="text-faint">
-                    {row.perMatchday.toFixed(1)}
-                  </Td>
-                  {row.projections.map((p) => (
-                    <Td
-                      key={p.matchdays}
-                      align="right"
-                      numeric
-                      style={
-                        row.isMe
-                          ? { color: "var(--color-brand-ink)", fontWeight: 600 }
-                          : undefined
-                      }
-                    >
-                      {p.points.toFixed(0)}
-                    </Td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Panel>
+            ))}
+          </tbody>
+        </Table>
 
         <p className="text-[12px] leading-relaxed text-faint">
-          <strong className="font-mono text-[11px] uppercase tracking-[0.08em]">
+          <strong className="font-mono text-[11px] uppercase tracking-[0.1em]">
             /jor
           </strong>{" "}
-          son los puntos del mejor once que cada uno puede poner. La proyección
-          supone que la plantilla no cambia y que todos alinean bien: nadie sabe
-          quién fichará ni quién se lesionará, así que a diez jornadas esto
-          ordena, no predice.
+          son los puntos del mejor once que cada uno puede poner: nadie sabe
+          quién fichará ni quién se lesionará.
         </p>
       </Section>
 
@@ -168,16 +161,19 @@ export default async function RivalesPage() {
           aside={`${rivals.length} equipos`}
           hint="Lo que puede pagar, lo que puede alinear, y qué le sale a cuenta quitarle."
         >
-          <div className="space-y-4">
+          <div className="border-t border-line">
             {rivals.map((rival) => (
-              <Panel key={rival.managerId} className="space-y-5">
+              <article
+                key={rival.managerId}
+                className="space-y-5 border-b border-line py-6"
+              >
                 {/* Identidad y caja: lo primero que se mira de un rival. */}
-                <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-x-10 gap-y-4">
                   <div className="min-w-0">
-                    <h3 className="truncate text-[17px] font-semibold tracking-[-0.015em]">
+                    <h3 className="truncate text-[20px] font-semibold tracking-[-0.02em]">
                       {rival.teamName}
                     </h3>
-                    <p className="eyebrow mt-0.5">
+                    <p className="eyebrow mt-1">
                       {rival.managerName ?? "Manager sin nombre"} ·{" "}
                       {rival.observedMoves === 0
                         ? "sin historial"
@@ -185,15 +181,12 @@ export default async function RivalesPage() {
                     </p>
                   </div>
 
-                  <div className="min-w-[13rem] flex-1 sm:max-w-xs">
+                  <div className="min-w-[14rem] flex-1 sm:max-w-sm">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="eyebrow">Caja estimada</span>
-                      <Figure
-                        tone={rival.cash.point > 0 ? "warn" : "muted"}
-                        className="text-[14px]"
-                      >
+                      <span className="scoreline text-[18px]">
                         {formatMoney(rival.cash.point)}
-                      </Figure>
+                      </span>
                     </div>
                     <RangeBar
                       min={rival.cash.min}
@@ -202,14 +195,14 @@ export default async function RivalesPage() {
                       scaleMax={cashScale}
                       format={formatMoney}
                     />
-                    <p className="text-[11px] text-faint">
-                      seguro {formatMoney(rival.cash.min)} · techo{" "}
+                    <p className="font-mono text-[10px] tracking-[0.06em] text-faint">
+                      SEGURO {formatMoney(rival.cash.min)} · TECHO{" "}
                       {formatMoney(rival.cash.max)}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-4 gap-y-5 border-t border-line pt-4 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-y-5 border-y border-line py-4 sm:grid-cols-4 sm:gap-0 sm:divide-x sm:divide-line sm:[&>*]:px-5 sm:[&>*:first-child]:pl-0">
                   <Stat
                     label="Patrimonio"
                     value={formatMoney(rival.cash.point + rival.squadValue)}
@@ -222,13 +215,10 @@ export default async function RivalesPage() {
                   />
                   <Stat label="Plantilla" value={rival.squad.length} />
                   <Stat
-                    label="Objetivos rentables"
+                    label="Le sale a cuenta quitarle"
                     value={rival.targets.length}
-                    tone={rival.targets.length > 0 ? "brand" : "muted"}
                     hint={
-                      rival.targets.length === 0
-                        ? "nada compensa hoy"
-                        : "de los suyos"
+                      rival.targets.length === 0 ? "nada compensa hoy" : "jugadores"
                     }
                   />
                 </div>
@@ -248,40 +238,37 @@ export default async function RivalesPage() {
                 )}
 
                 {rival.targets.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="eyebrow">Le sale a cuenta quitarle</p>
-                    <ul>
-                      {rival.targets.slice(0, 3).map((target) => (
-                        <li
-                          key={target.playerId}
-                          className="border-b border-line py-2.5 last:border-b-0"
-                        >
-                          <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <span>
-                              <strong className="text-[14px] font-medium">
-                                {target.name}
-                              </strong>{" "}
-                              <span className="eyebrow">
-                                cláusula {formatMoney(target.clause)}
-                              </span>
+                  <ul>
+                    {rival.targets.slice(0, 3).map((target) => (
+                      <li
+                        key={target.playerId}
+                        className="border-b border-line py-2.5 last:border-b-0"
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span>
+                            <strong className="text-[14px] font-medium">
+                              {target.name}
+                            </strong>{" "}
+                            <span className="eyebrow">
+                              cláusula {formatMoney(target.clause)}
                             </span>
-                            <Figure tone="brand" className="text-[14px]">
-                              +{formatMoney(target.netSurplus)}
-                            </Figure>
-                          </div>
-                          <p className="mt-1 text-[12px] leading-relaxed text-muted">
-                            {target.reason}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                          </span>
+                          <Figure tone="brand" className="text-[14px]">
+                            +{formatMoney(target.netSurplus)}
+                          </Figure>
+                        </div>
+                        <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-muted">
+                          {target.reason}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
 
-                <div className="space-y-3 border-t border-line pt-4">
+                <div>
                   {rival.starters.length > 0 && (
                     <Disclosure summary="Ver su mejor once sobre el campo">
-                      <div className="space-y-2 sm:max-w-sm">
+                      <div className="space-y-2 sm:max-w-xs">
                         <Pitch players={rival.starters} />
                         <p className="text-[12px] leading-relaxed text-faint">
                           Es el mejor once que <strong>puede</strong> poner, no
@@ -353,7 +340,7 @@ export default async function RivalesPage() {
                           ))}
                         </tbody>
                       </Table>
-                      <p className="mt-2.5 text-[12px] leading-relaxed text-faint">
+                      <p className="mt-2.5 max-w-3xl text-[12px] leading-relaxed text-faint">
                         Este es el libro de cuentas del que sale su caja
                         estimada. Empieza en el presupuesto inicial y se le
                         aplica cada operación. Una fila con <strong>?</strong> es
@@ -366,12 +353,12 @@ export default async function RivalesPage() {
                   <Disclosure
                     summary={`Ver su plantilla completa (${rival.squad.length})`}
                   >
-                    <ul>
+                    <ul className="sm:columns-2 sm:gap-10">
                       {rival.squad
                         .slice()
                         .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
                         .map((player) => (
-                          <Row key={player.playerId}>
+                          <Row key={player.playerId} className="break-inside-avoid">
                             <span className="min-w-0 truncate text-[13px]">
                               {player.name}{" "}
                               <span className="font-mono text-[11px] uppercase text-faint">
@@ -389,21 +376,11 @@ export default async function RivalesPage() {
                     </ul>
                   </Disclosure>
                 </div>
-              </Panel>
+              </article>
             ))}
           </div>
         </Section>
       )}
-
-      <footer className="border-t border-line pt-5 text-[12px] leading-relaxed text-faint">
-        <p>
-          La caja de cada rival es una <strong>banda</strong>, no una cifra: se
-          reconstruye movimiento a movimiento desde el feed de actividad, y
-          cuando un movimiento no expone su importe la banda se ensancha en vez
-          de inventarse un número. Una banda ancha y honesta vale más que una
-          cifra estrecha e inventada.
-        </p>
-      </footer>
     </Page>
   );
 }

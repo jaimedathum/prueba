@@ -4,11 +4,10 @@ import {
   Badge,
   Empty,
   Figure,
+  Notice,
   Page,
-  Panel,
+  Row,
   Section,
-  Stat,
-  StatGrid,
   Table,
   Td,
   Th,
@@ -23,11 +22,11 @@ export const dynamic = "force-dynamic";
  * lo sincronizado coincide con la app oficial. Por eso enseña la cláusula y su
  * ratio, que es lo que no se ve cómodamente en el juego.
  *
- * El mismo listado se pinta de dos maneras. En móvil, una tarjeta por
- * jugador: seis columnas en 375px obligan a desplazar en horizontal para leer
- * una fila, que es justo lo que hace inservible una tabla en el bolsillo. A
- * partir de tablet, tabla de verdad, que es como se compara una plantilla
- * entera de un vistazo.
+ * El mismo listado se pinta de dos maneras. En móvil, una ficha por jugador:
+ * seis columnas en 375px obligan a desplazar en horizontal para leer una fila,
+ * que es justo lo que hace inservible una tabla en el bolsillo. A partir de
+ * tablet, tabla de verdad, que es como se compara una plantilla entera de un
+ * vistazo.
  */
 export default async function Home() {
   let data;
@@ -51,103 +50,80 @@ export default async function Home() {
     <Page
       eyebrow="Mi equipo"
       title={me ? me.teamName : "Equipo sin identificar"}
-      subtitle={
-        me?.reportedBalance != null
-          ? `Saldo disponible ${formatMoney(me.reportedBalance)}. Es el único saldo visible de la liga, y por eso es el patrón contra el que se calibra todo lo demás.`
-          : "Saldo no disponible todavía. Sincroniza para traerlo."
-      }
+      subtitle="El ratio es cláusula ÷ valor. Por debajo de 1, el jugador le sale barato a un rival: pagarla le cuesta menos de lo que vale lo que se lleva."
+      meta={[
+        {
+          label: "Saldo",
+          value:
+            me?.reportedBalance != null
+              ? formatMoney(me.reportedBalance)
+              : "sin dato",
+        },
+        { label: "Valor plantilla", value: formatMoney(valorTotal) },
+        {
+          label: "Última lectura",
+          value: lastSync
+            ? lastSync.startedAt.toLocaleString("es-ES", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "nunca",
+        },
+      ]}
     >
-      <Panel>
-        <StatGrid>
-          <Stat
-            label="Jugadores"
-            value={squad.length}
-            hint={valorTotal > 0 ? `${formatMoney(valorTotal)} en valor` : undefined}
-          />
-          <Stat
-            label="Cláusula bajo valor"
-            value={enRiesgo}
-            tone={enRiesgo > 0 ? "warn" : "good"}
-            hint={enRiesgo > 0 ? "salen baratos a un rival" : "ninguno barato"}
-          />
-          <Stat
-            label="Última lectura"
-            value={
-              lastSync
-                ? lastSync.startedAt.toLocaleTimeString("es-ES", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "—"
-            }
-            hint={
-              lastSync
-                ? lastSync.startedAt.toLocaleDateString("es-ES", {
-                    day: "2-digit",
-                    month: "long",
-                  })
-                : "sin ejecutar"
-            }
-            tone={lastSync?.status === "failed" ? "bad" : undefined}
-          />
-          <Stat
-            label="Estado"
-            value={lastSync ? estadoLegible(lastSync.status) : "—"}
-            tone={
-              lastSync?.status === "ok"
-                ? "good"
-                : lastSync?.status === "failed"
-                  ? "bad"
-                  : "muted"
-            }
-          />
-        </StatGrid>
+      {lastSync?.status === "failed" && (
+        <Notice tone="bad" title="La última sincronización falló">
+          {lastSync.error ?? "Sin detalle del error."}
+        </Notice>
+      )}
 
-        {lastSync?.error && (
-          <p className="mt-4 border-t border-line pt-3 text-[13px] leading-relaxed text-bad">
-            {lastSync.error}
-          </p>
-        )}
-      </Panel>
+      {enRiesgo > 0 && (
+        <Notice tone="warn" title={`${enRiesgo} por debajo de su valor`}>
+          Esos jugadores le salen baratos a cualquiera que tenga caja. Lo que
+          hay que hacer con cada uno está en{" "}
+          <a className="underline underline-offset-2" href="/riesgo">
+            riesgo y cláusulas
+          </a>
+          .
+        </Notice>
+      )}
 
-      <Section
-        title="Mi plantilla"
-        aside={`${squad.length} jugadores`}
-        hint="El ratio es cláusula ÷ valor. Por debajo de 1, el jugador le sale barato a un rival: pagarla le cuesta menos de lo que vale lo que se lleva."
-      >
+      <Section title="Mi plantilla" aside={`${squad.length} jugadores`}>
         {squad.length === 0 ? (
           <Empty>
             Sin jugadores todavía. Comprueba en{" "}
-            <a className="font-medium text-brand-ink underline" href="/setup">
+            <a className="underline underline-offset-2" href="/setup">
               la puesta en marcha
             </a>{" "}
             que la sincronización ha identificado tu equipo dentro de la liga.
           </Empty>
         ) : (
           <>
-            {/* Móvil: una tarjeta por jugador. */}
-            <ul className="space-y-2 sm:hidden">
+            {/* Móvil: una ficha por jugador. */}
+            <ul className="border-t border-line sm:hidden">
               {squad.map((row) => (
-                <Panel key={row.playerId} as="li" className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
+                <Row key={row.playerId} className="items-center">
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-1.5">
                       <span className="truncate text-[14px] font-medium">
                         {row.name}
                       </span>
                       <Marcas row={row} />
-                    </div>
-                    <div className="eyebrow mt-1">
+                    </span>
+                    <span className="eyebrow mt-1 block">
                       {row.position} · {formatMoney(row.marketValue)}
-                    </div>
-                  </div>
+                    </span>
+                  </span>
 
-                  <div className="shrink-0 text-right">
+                  <span className="shrink-0 text-right">
                     <Figure className="block text-[13px]">
                       {formatMoney(row.buyoutClause)}
                     </Figure>
                     <ClauseRatio ratio={row.clauseRatio} />
-                  </div>
-                </Panel>
+                  </span>
+                </Row>
               ))}
             </ul>
 
@@ -215,13 +191,6 @@ function Marcas({
         </Badge>
       )}
     </>
-  );
-}
-
-function estadoLegible(status: string): string {
-  return (
-    { ok: "Correcta", failed: "Con error", running: "En curso" }[status] ??
-    status
   );
 }
 

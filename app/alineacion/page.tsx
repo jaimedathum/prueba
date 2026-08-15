@@ -5,13 +5,11 @@ import {
   Disclosure,
   Empty,
   Figure,
+  Lede,
   Notice,
   Page,
-  Panel,
   Row,
   Section,
-  Stat,
-  StatGrid,
   Table,
   Td,
   Th,
@@ -45,7 +43,7 @@ export default async function AlineacionPage() {
         <Empty>
           Todavía no se ha identificado tu equipo dentro de la liga. Pulsa
           Sincronizar arriba, y si sigue igual mira los avisos en{" "}
-          <a className="font-medium text-brand-ink underline" href="/setup">
+          <a className="underline underline-offset-2" href="/setup">
             la puesta en marcha
           </a>
           .
@@ -60,13 +58,15 @@ export default async function AlineacionPage() {
     <Page
       eyebrow="Mi equipo"
       title="Alineación"
-      subtitle={
-        <>
-          {nextMatchday ? `Jornada ${nextMatchday}` : "Sin jornada pendiente"} ·
-          modelo ajustado con {model.matches} partidos
-          {model.converged ? "" : " (insuficientes)"}
-        </>
-      }
+      subtitle="El once se resuelve exacto: se enumeran todas las formaciones legales y dentro de cada una se asigna por flujo de coste mínimo. No es una heurística."
+      meta={[
+        { label: "Jornada", value: nextMatchday ?? "—" },
+        { label: "Dibujo", value: lineup?.formation.name ?? "—" },
+        {
+          label: "Partidos del modelo",
+          value: `${model.matches}${model.converged ? "" : " ⚠"}`,
+        },
+      ]}
     >
       {warnings.length > 0 ? (
         <Notice title="Lo que falta y qué se pierde por ello">
@@ -90,58 +90,60 @@ export default async function AlineacionPage() {
             aside={lineup.formation.name}
             hint="En el campo, el número es lo que se espera que puntúe cada uno. El color avisa de quién puede dejarte a cero: tiza va bien, ámbar es dudoso y rojo es probable que no juegue."
           >
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+            <div className="grid gap-7 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:items-start lg:gap-10">
               <Pitch players={lineup.starters} />
 
-              <div className="space-y-4">
-                <Panel>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                    <Stat
-                      label="Puntos esperados"
-                      value={lineup.expectedPoints.toFixed(1)}
-                      hint="suma de los once"
-                    />
-                    <Stat label="Formación" value={lineup.formation.name} />
-                    <Stat
-                      label="No jugarán"
-                      value={lineup.expectedMissing.toFixed(1)}
-                      hint="de los once"
-                      tone={lineup.expectedMissing >= 2 ? "warn" : "good"}
-                    />
-                    <Stat label="Jornada" value={nextMatchday ?? "—"} />
-                  </div>
-                </Panel>
+              <div className="space-y-7">
+                <div className="flex flex-wrap items-start gap-x-12 gap-y-6">
+                  <Lede
+                    label="Puntos esperados"
+                    value={lineup.expectedPoints.toFixed(1)}
+                    hint="Suma de los once titulares con el dibujo elegido."
+                    accent
+                  />
+                  <Lede
+                    label="Se espera que no jueguen"
+                    value={lineup.expectedMissing.toFixed(1)}
+                    hint="De los once. Por encima de dos, conviene mirar el banquillo antes de cerrar."
+                  />
+                </div>
 
-                <Panel>
-                  <p className="eyebrow mb-2.5">Qué cuesta cambiar de dibujo</p>
+                <div>
+                  <p className="eyebrow rule border-b border-line py-2">
+                    Qué cuesta cambiar de dibujo
+                  </p>
                   <ul>
                     {lineup.alternatives.map((alternative) => {
                       const optima = alternative.cost <= 0;
                       return (
                         <Row key={alternative.formation}>
                           <span
-                            className={`text-[13px] ${optima ? "font-medium" : ""}`}
+                            className={`text-[13px] ${optima ? "font-semibold" : ""}`}
                           >
                             {alternative.formation}
                           </span>
-                          <span className="flex items-baseline gap-2">
+                          <span className="flex items-baseline gap-3">
                             <Figure className="text-[12px]">
                               {alternative.expectedPoints.toFixed(1)}
                             </Figure>
-                            <Figure
-                              tone={optima ? "brand" : "muted"}
-                              className="w-14 text-right text-[11px]"
+                            <span
+                              className="w-16 text-right font-mono text-[10px] uppercase tracking-[0.1em]"
+                              style={{
+                                color: optima
+                                  ? "var(--color-ink)"
+                                  : "var(--color-faint)",
+                              }}
                             >
                               {optima
                                 ? "óptima"
                                 : `−${alternative.cost.toFixed(1)}`}
-                            </Figure>
+                            </span>
                           </span>
                         </Row>
                       );
                     })}
                   </ul>
-                </Panel>
+                </div>
               </div>
             </div>
 
@@ -171,7 +173,7 @@ export default async function AlineacionPage() {
                       <Td align="right">
                         <RiskCell risk={player.riskOfZero} />
                       </Td>
-                      <Td className="min-w-[16rem] text-[12px] leading-relaxed text-muted">
+                      <Td className="min-w-[18rem] text-[12px] leading-relaxed text-muted">
                         {explanations.get(player.playerId)}
                       </Td>
                     </tr>
@@ -186,34 +188,27 @@ export default async function AlineacionPage() {
             aside={`${lineup.bench.length} fuera`}
             hint="Ordenados por lo que aportarían si entraran. El primero es tu recambio real."
           >
-            <Panel>
-              <ul>
-                {lineup.bench.map((player) => (
-                  <Row key={player.playerId}>
-                    <span className="min-w-0 truncate text-[13px]">
-                      {player.name}{" "}
-                      <span className="font-mono text-[11px] uppercase text-faint">
-                        {positionCode(player.positionId)}
-                      </span>
+            <ul className="border-t border-line sm:columns-2 sm:gap-10">
+              {lineup.bench.map((player) => (
+                <Row key={player.playerId} className="break-inside-avoid">
+                  <span className="min-w-0 truncate text-[13px]">
+                    {player.name}{" "}
+                    <span className="font-mono text-[11px] uppercase text-faint">
+                      {positionCode(player.positionId)}
                     </span>
-                    <Figure className="text-[12px]">
-                      {player.expectedPoints.toFixed(1)}
-                      <span className="unit"> pts</span>
-                    </Figure>
-                  </Row>
-                ))}
-              </ul>
-            </Panel>
+                  </span>
+                  <Figure className="text-[12px]">
+                    {player.expectedPoints.toFixed(1)}
+                    <span className="unit"> pts</span>
+                  </Figure>
+                </Row>
+              ))}
+            </ul>
           </Section>
         </>
       )}
 
-      <footer className="space-y-1.5 border-t border-line pt-5 text-[12px] leading-relaxed text-faint">
-        <p>
-          El once se resuelve exacto: se enumeran todas las formaciones legales
-          y dentro de cada una se asigna por flujo de coste mínimo. No es una
-          heurística.
-        </p>
+      <footer className="rule pt-4 text-[12px] leading-relaxed text-faint">
         <p>
           Ventaja de jugar en casa estimada: ×
           {Math.exp(model.homeAdvantage).toFixed(2)} en goles esperados.

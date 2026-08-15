@@ -1,4 +1,4 @@
-import { ButtonLink, Output, Panel } from "./ui";
+import { ButtonLink, Output } from "./ui";
 import { Mark } from "./nav";
 
 /**
@@ -12,24 +12,20 @@ import { Mark } from "./nav";
  */
 export function SetupNotice({ message }: { message: string }) {
   return (
-    <main className="mx-auto max-w-2xl space-y-7 py-4">
-      <header className="space-y-3">
-        <Mark size={38} />
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-[-0.025em]">
-            Falta configuración
-          </h1>
-          <p className="text-[13px] leading-relaxed text-muted">
-            La app no ha podido leer sus datos. Abajo está el motivo exacto, y
-            debajo lo que hay que hacer para arreglarlo.
-          </p>
-        </div>
+    <main className="max-w-2xl space-y-8 pb-6">
+      <header>
+        <Mark size={32} />
+        <h1 className="display mt-4">Falta configuración</h1>
+        <p className="rule-heavy mt-5 max-w-xl pt-3 text-[13.5px] leading-relaxed text-muted">
+          La app no ha podido leer sus datos. Abajo está el motivo exacto, y
+          debajo lo que hay que hacer para arreglarlo.
+        </p>
       </header>
 
       <Output tone="warn">{message}</Output>
 
-      <Panel className="space-y-3">
-        <p className="eyebrow">Sin terminal, recomendado</p>
+      <section className="rule-heavy space-y-3 pt-3">
+        <h2 className="slug">Sin terminal, recomendado</h2>
         <p className="text-[13px] leading-relaxed text-muted">
           Todo lo que falta se hace desde el navegador: comprobar la
           configuración, iniciar sesión y traer los primeros datos.
@@ -37,13 +33,16 @@ export function SetupNotice({ message }: { message: string }) {
         <ButtonLink href="/setup" variant="primary">
           Ir a la puesta en marcha
         </ButtonLink>
-      </Panel>
+      </section>
 
-      <section className="space-y-3">
-        <h2 className="eyebrow">Con terminal</h2>
-        <ol className="space-y-2.5 text-[13px] leading-relaxed text-muted">
+      <section className="rule-heavy pt-3">
+        <h2 className="slug mb-3">Con terminal</h2>
+        <ol className="border-t border-line">
           {PASOS.map((paso, index) => (
-            <li key={paso.cmd} className="flex gap-3">
+            <li
+              key={paso.cmd}
+              className="flex gap-4 border-b border-line py-2.5 text-[13px] leading-relaxed text-muted"
+            >
               <span className="nums shrink-0 font-mono text-[11px] text-faint">
                 {String(index + 1).padStart(2, "0")}
               </span>
@@ -55,7 +54,7 @@ export function SetupNotice({ message }: { message: string }) {
         </ol>
       </section>
 
-      <p className="border-t border-line pt-5 text-[12px] leading-relaxed text-faint">
+      <p className="rule pt-4 text-[12px] leading-relaxed text-faint">
         Las reglas del juego pendientes de confirmar están en{" "}
         <code>docs/reglas.md</code>. Ninguna se ha dado por supuesta en el
         código.

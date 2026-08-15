@@ -1,4 +1,4 @@
-import { Panel, Skeleton } from "./ui";
+import { Skeleton } from "./ui";
 
 /**
  * Lo que se ve mientras el servidor calcula.
@@ -9,40 +9,36 @@ import { Panel, Skeleton } from "./ui";
  * a llegar hace la espera más corta de lo que es, y sobre todo evita el salto
  * de layout cuando llega.
  */
-export function PageSkeleton({
-  rows = 6,
-  stats = true,
-}: {
-  rows?: number;
-  stats?: boolean;
-}) {
+export function PageSkeleton({ rows = 7 }: { rows?: number }) {
   return (
-    <div className="space-y-8" aria-busy role="status" aria-label="Cargando">
-      <div className="space-y-2.5 border-b border-line pb-5">
+    <div className="space-y-10" aria-busy role="status" aria-label="Cargando">
+      <div>
         <Skeleton className="h-2.5 w-20" />
-        <Skeleton className="h-7 w-56" />
-        <Skeleton className="h-3.5 w-full max-w-md" />
-      </div>
-
-      {stats && (
-        <Panel>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="space-y-2">
+        <Skeleton className="mt-3 h-12 w-72 max-w-full" />
+        <div className="rule-heavy mt-5 flex flex-wrap justify-between gap-6 pt-3">
+          <Skeleton className="h-3.5 w-full max-w-md" />
+          <div className="flex gap-8">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index}>
                 <Skeleton className="h-2.5 w-16" />
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-2.5 w-20" />
+                <Skeleton className="mt-2 h-4 w-20" />
               </div>
             ))}
           </div>
-        </Panel>
-      )}
+        </div>
+      </div>
 
-      <div className="space-y-3.5">
-        <Skeleton className="h-4 w-40" />
-        <div className="space-y-2">
+      <div>
+        <div className="rule-heavy flex justify-between pt-3">
+          <Skeleton className="h-3.5 w-40" />
+          <Skeleton className="h-2.5 w-20" />
+        </div>
+        <div className="mt-5 border-t border-line">
           {Array.from({ length: rows }).map((_, index) => (
-            <Skeleton key={index} className="h-16" />
+            <div key={index} className="border-b border-line py-3.5">
+              <Skeleton className="h-3.5 w-48 max-w-full" />
+              <Skeleton className="mt-2 h-2.5 w-32" />
+            </div>
           ))}
         </div>
       </div>

@@ -21,7 +21,7 @@ export const metadata: Metadata = {
  */
 export default function LoginPage() {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="max-w-2xl">
       <Page
         eyebrow="Puesta en marcha · paso 2 de 3"
         title="Login inicial"

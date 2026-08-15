@@ -7,95 +7,61 @@ import { useEffect, useRef, useState } from "react";
 /**
  * Navegación.
  *
- * Dos formas para dos maneras de usar la app, no una redimensionada:
+ * En escritorio es una **cabecera de periódico**: nombre arriba, regla
+ * gruesa, y debajo la tira de secciones en versalitas estrechas. No hay
+ * columna lateral, y no es por gusto: la pantalla de rivales tiene tablas
+ * de ocho columnas, y regalarle 250px fijos a un menú que siempre dice lo
+ * mismo era pagar ancho de tabla por comodidad de nadie.
  *
- * - **En móvil**, barra abajo con los cinco destinos que se consultan en
- *   caliente, mientras se mira la app oficial. Va abajo porque es donde
- *   llega el pulgar, y el área táctil llega a 44px aunque el texto sea de
- *   diez píxeles.
- * - **En escritorio**, una columna fija a la izquierda con los destinos
- *   agrupados por la pregunta que responden. Con sitio de sobra, agrupar
- *   enseña de qué va el producto; una fila de siete enlaces sueltos, no.
+ * En móvil la tira baja al pie, fija, porque es donde llega el pulgar de
+ * quien consulta esto de pie mientras mira la app oficial.
  *
- * Lo que no entra en la barra de móvil no desaparece: vive en el menú de
- * la cabecera.
+ * Sin iconos, a propósito. Cinco destinos que se llaman Plantilla, Once,
+ * Mercado, Rivales y Riesgo no ganan nada con un pictograma al lado: el
+ * icono de librería es ruido, y encima es lo que hace que todas las
+ * aplicaciones se parezcan entre sí.
  */
 
 interface Destino {
   href: string;
-  /** Etiqueta corta, para la barra de móvil. */
+  /** Etiqueta corta, para la tira. */
   short: string;
-  /** Etiqueta larga, para la columna de escritorio. */
+  /** Etiqueta larga, para el menú y los sitios con espacio. */
   label: string;
-  icon: () => React.ReactElement;
 }
 
-const SQUAD: Destino = {
-  href: "/",
-  short: "Plantilla",
-  label: "Mi plantilla",
-  icon: SquadIcon,
-};
-const LINEUP: Destino = {
-  href: "/alineacion",
-  short: "Once",
-  label: "Alineación",
-  icon: PitchIcon,
-};
-const MARKET: Destino = {
-  href: "/mercado",
-  short: "Mercado",
-  label: "Mercado y pujas",
-  icon: MarketIcon,
-};
-const RISK: Destino = {
-  href: "/riesgo",
-  short: "Riesgo",
-  label: "Riesgo y cláusulas",
-  icon: RiskIcon,
-};
-const RIVALS: Destino = {
-  href: "/rivales",
-  short: "Rivales",
-  label: "Rivales",
-  icon: RivalsIcon,
-};
+const SQUAD: Destino = { href: "/", short: "Plantilla", label: "Mi plantilla" };
+const LINEUP: Destino = { href: "/alineacion", short: "Once", label: "Alineación" };
+const MARKET: Destino = { href: "/mercado", short: "Mercado", label: "Mercado y pujas" };
+const RIVALS: Destino = { href: "/rivales", short: "Rivales", label: "Rivales" };
+const RISK: Destino = { href: "/riesgo", short: "Riesgo", label: "Riesgo y cláusulas" };
 const OVERRIDES: Destino = {
   href: "/overrides",
   short: "Correcciones",
-  label: "Correcciones",
-  icon: TuneIcon,
+  label: "Correcciones manuales",
 };
 const SETUP: Destino = {
   href: "/setup",
   short: "Ajustes",
   label: "Puesta en marcha",
-  icon: SetupIcon,
 };
 
 /** Los cinco que caben cómodos en 375px sin cortar etiquetas. */
 const TABS = [SQUAD, LINEUP, MARKET, RIVALS, RISK];
 
-/** Agrupados por la pregunta que contestan, no por orden de construcción. */
-const GROUPS: { title: string; items: Destino[] }[] = [
-  { title: "Mi equipo", items: [SQUAD, LINEUP] },
-  { title: "Decidir", items: [MARKET, RISK] },
-  { title: "La liga", items: [RIVALS] },
-  { title: "Sistema", items: [OVERRIDES, SETUP] },
-];
-
-/** Lo que no cabe en la barra de móvil. */
-const OVERFLOW = [OVERRIDES, SETUP];
+/** Lo secundario: en escritorio al final de la tira, en móvil en el menú. */
+const SECONDARY = [OVERRIDES, SETUP];
 
 /* ------------------------------------------------------------------ *
  * Marca
  * ------------------------------------------------------------------ */
 
 /**
- * El campo visto desde arriba, reducido a lo que sigue siendo reconocible
- * a 24 píxeles: línea de medio campo, círculo central y las dos áreas.
+ * El campo visto desde arriba, reducido a lo que sigue siendo
+ * reconocible a 24 píxeles: línea de medio campo, círculo central y las
+ * dos áreas. Cuadrado y no redondeado, como el resto del sistema.
  */
-export function Mark({ size = 26 }: { size?: number }) {
+export function Mark({ size = 24 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -104,100 +70,105 @@ export function Mark({ size = 26 }: { size?: number }) {
       aria-hidden
       className="shrink-0"
     >
-      <rect width="24" height="24" rx="7" fill="var(--color-brand)" />
+      <rect width="24" height="24" rx="2" fill="var(--color-brand)" />
       <g
         stroke="var(--color-on-brand)"
         strokeWidth="1.4"
-        strokeLinecap="round"
+        strokeLinecap="square"
         fill="none"
       >
-        <path d="M3.5 12h17" />
+        <path d="M3 12h18" />
         <circle cx="12" cy="12" r="3.6" />
-        <path d="M8.5 4.2v1.6h7V4.2M8.5 19.8v-1.6h7v1.6" />
+        <path d="M8.5 3.5v1.8h7V3.5M8.5 20.5v-1.8h7v1.8" />
       </g>
     </svg>
   );
 }
 
+/** La cabecera del periódico: el nombre, compuesto como un rótulo. */
 export function Wordmark() {
   return (
     <Link href="/" className="flex items-center gap-2.5 no-underline">
       <Mark />
-      <span className="min-w-0">
-        <span className="block text-[14px] font-semibold leading-tight tracking-[-0.02em] text-ink">
-          Fantasy Advisor
-        </span>
-        <span className="eyebrow block leading-tight">Liga privada</span>
+      <span
+        className="slug text-ink"
+        style={{ fontSize: "15px", letterSpacing: "0.03em" }}
+      >
+        Fantasy Advisor
       </span>
     </Link>
   );
 }
 
 /* ------------------------------------------------------------------ *
- * Columna de escritorio
+ * Tira de secciones (escritorio)
  * ------------------------------------------------------------------ */
 
-export function Sidebar() {
+export function SectionStrip() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-line bg-surface lg:flex">
-      <div className="px-5 py-5">
-        <Wordmark />
-      </div>
-
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
-        {GROUPS.map((group) => (
-          <div key={group.title} className="space-y-1">
-            <p className="eyebrow px-2 pb-1">{group.title}</p>
-            {group.items.map((item) => (
-              <SidebarLink
-                key={item.href}
-                item={item}
-                active={isActive(pathname, item.href)}
-              />
-            ))}
-          </div>
-        ))}
-      </nav>
-
-      <p className="border-t border-line px-5 py-4 text-[11px] leading-relaxed text-faint">
-        El motor calcula, la IA explica.
-        <br />
-        Nunca al revés.
-      </p>
-    </aside>
+    <nav className="hidden items-stretch lg:flex" aria-label="Secciones">
+      {TABS.map((item) => (
+        <StripLink
+          key={item.href}
+          item={item}
+          active={isActive(pathname, item.href)}
+        />
+      ))}
+      <span aria-hidden className="mx-3 my-2 w-px bg-line" />
+      {SECONDARY.map((item) => (
+        <StripLink
+          key={item.href}
+          item={item}
+          active={isActive(pathname, item.href)}
+          quiet
+        />
+      ))}
+    </nav>
   );
 }
 
-function SidebarLink({ item, active }: { item: Destino; active: boolean }) {
-  const Icon = item.icon;
+function StripLink({
+  item,
+  active,
+  quiet = false,
+}: {
+  item: Destino;
+  active: boolean;
+  quiet?: boolean;
+}) {
   return (
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className="relative flex items-center gap-2.5 rounded-control px-2 py-2 text-[13px] font-medium no-underline transition-colors"
+      className="relative px-3.5 py-2.5 font-sans no-underline transition-colors first:pl-0"
       style={{
-        background: active ? "var(--color-raised)" : "transparent",
-        color: active ? "var(--color-ink)" : "var(--color-muted)",
+        fontStretch: "82%",
+        fontSize: quiet ? "11px" : "12.5px",
+        fontWeight: active ? 700 : 500,
+        letterSpacing: "0.07em",
+        textTransform: "uppercase",
+        color: active
+          ? "var(--color-ink)"
+          : quiet
+            ? "var(--color-faint)"
+            : "var(--color-muted)",
       }}
     >
-      {/* El indicador de posición es una marca de marca, no un subrayado. */}
+      {/* La bandera de la sección activa se apoya sobre la regla gruesa. */}
       <span
         aria-hidden
-        className="absolute -left-3 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r"
+        className="absolute inset-x-0 top-0 h-[3px] first:left-0"
         style={{ background: active ? "var(--color-brand)" : "transparent" }}
       />
-      <span style={{ color: active ? "var(--color-brand-ink)" : "inherit" }}>
-        <Icon />
-      </span>
-      {item.label}
+      {item.short}
     </Link>
   );
 }
 
 /* ------------------------------------------------------------------ *
- * Barra de móvil
+ * Tira de secciones (móvil)
  * ------------------------------------------------------------------ */
 
 export function MobileTabs() {
@@ -205,35 +176,38 @@ export function MobileTabs() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 bg-canvas lg:hidden"
       style={{
+        borderColor: "var(--color-rule)",
         // La barra de gestos de iOS se come los últimos píxeles.
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
+      aria-label="Secciones"
     >
       {TABS.map((item) => {
         const active = isActive(pathname, item.href);
-        const Icon = item.icon;
         return (
           <Link
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className="tap relative flex flex-col items-center justify-center gap-1 py-2 font-mono text-[9px] font-medium uppercase tracking-[0.06em] no-underline"
+            className="tap relative flex items-center justify-center px-1 text-center no-underline"
             style={{
+              fontStretch: "80%",
+              fontSize: "11px",
+              fontWeight: active ? 700 : 500,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
               color: active ? "var(--color-ink)" : "var(--color-faint)",
             }}
           >
             <span
               aria-hidden
-              className="absolute inset-x-4 top-0 h-[2px] rounded-b"
-              style={{ background: active ? "var(--color-brand)" : "transparent" }}
+              className="absolute inset-x-0 -top-[2px] h-[3px]"
+              style={{
+                background: active ? "var(--color-brand)" : "transparent",
+              }}
             />
-            <span
-              style={{ color: active ? "var(--color-brand-ink)" : "inherit" }}
-            >
-              <Icon />
-            </span>
             {item.short}
           </Link>
         );
@@ -277,41 +251,33 @@ export function OverflowMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Más opciones"
-        className="press flex h-9 w-9 items-center justify-center rounded-control border border-line text-muted hover:text-ink"
+        className="press flex h-9 w-9 items-center justify-center border border-line-strong font-mono text-[13px] leading-none text-muted hover:text-ink"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden
-        >
-          <circle cx="5" cy="12" r="1.8" />
-          <circle cx="12" cy="12" r="1.8" />
-          <circle cx="19" cy="12" r="1.8" />
-        </svg>
+        {open ? "×" : "≡"}
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-panel border border-line bg-surface p-1.5 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1.5 w-60 border bg-canvas p-3"
+          style={{ borderColor: "var(--color-rule)" }}
         >
-          <p className="eyebrow px-2 py-1.5 lg:hidden">Sistema</p>
-          {OVERFLOW.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="tap flex items-center gap-2.5 rounded-control px-2 text-[13px] font-medium text-muted no-underline transition-colors hover:bg-raised hover:text-ink lg:hidden"
-            >
-              <item.icon />
-              {item.label}
-            </Link>
-          ))}
-          <div className="my-1.5 h-px bg-line lg:hidden" />
-          <p className="eyebrow px-2 py-1.5">Aspecto</p>
+          <div className="lg:hidden">
+            <p className="eyebrow pb-1.5">Sistema</p>
+            {SECONDARY.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="tap flex items-center border-b border-line text-[13px] font-medium text-muted no-underline transition-colors last:border-b-0 hover:text-ink"
+              >
+                {item.label}
+              </Link>
+            ))}
+            <p className="eyebrow pb-1.5 pt-4">Aspecto</p>
+          </div>
+          <p className="eyebrow hidden pb-1.5 lg:block">Aspecto</p>
           <ThemeChoices onPick={() => setOpen(false)} />
         </div>
       )}
@@ -329,8 +295,8 @@ const THEME_KEY = "fa-theme";
 
 const THEMES: { value: Theme; label: string }[] = [
   { value: "system", label: "El del sistema" },
-  { value: "light", label: "Claro" },
-  { value: "dark", label: "Oscuro" },
+  { value: "light", label: "Papel" },
+  { value: "dark", label: "Tinta" },
 ];
 
 function ThemeChoices({ onPick }: { onPick: () => void }) {
@@ -362,7 +328,7 @@ function ThemeChoices({ onPick }: { onPick: () => void }) {
           key={option.value}
           type="button"
           onClick={() => apply(option.value)}
-          className="tap flex w-full items-center gap-2.5 rounded-control px-2 text-left text-[13px] font-medium transition-colors hover:bg-raised"
+          className="tap flex w-full items-center gap-2.5 border-b border-line text-left text-[13px] font-medium transition-colors last:border-b-0 hover:text-ink"
           style={{
             color:
               theme === option.value ? "var(--color-ink)" : "var(--color-muted)",
@@ -370,7 +336,7 @@ function ThemeChoices({ onPick }: { onPick: () => void }) {
         >
           <span
             aria-hidden
-            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            className="h-2 w-2 shrink-0"
             style={{
               background:
                 theme === option.value
@@ -392,89 +358,4 @@ function ThemeChoices({ onPick }: { onPick: () => void }) {
 /** La raíz solo está activa en exacto; el resto, también en sus subrutas. */
 function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
-}
-
-/* ------------------------------------------------------------------ *
- * Iconos. En línea y monocromos: heredan el color del enlace activo y no
- * añaden ni una petición de red.
- * ------------------------------------------------------------------ */
-
-const svg = {
-  width: 18,
-  height: 18,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.6,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-function SquadIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-    </svg>
-  );
-}
-
-function PitchIcon() {
-  return (
-    <svg {...svg}>
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M3 12h18" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function MarketIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M3 6h18l-1.5 12a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2Z" />
-      <path d="M8 6V4a4 4 0 0 1 8 0v2" />
-    </svg>
-  );
-}
-
-function RiskIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M12 3 2 20h20Z" />
-      <path d="M12 10v4" />
-      <path d="M12 17h.01" />
-    </svg>
-  );
-}
-
-function RivalsIcon() {
-  return (
-    <svg {...svg}>
-      <circle cx="8" cy="9" r="3" />
-      <circle cx="17" cy="9" r="3" />
-      <path d="M2 20a6 6 0 0 1 12 0" />
-      <path d="M13 20a6 6 0 0 1 9-5" />
-    </svg>
-  );
-}
-
-function TuneIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3" />
-      <path d="M1 14h6M9 8h6M17 16h6" />
-    </svg>
-  );
-}
-
-function SetupIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M19.1 4.9l-2.2 2.2M7.1 16.9l-2.2 2.2" />
-      <circle cx="12" cy="12" r="3.5" />
-    </svg>
-  );
 }

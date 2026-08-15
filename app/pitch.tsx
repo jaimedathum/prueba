@@ -40,9 +40,9 @@ export function Pitch({ players }: { players: PitchPlayer[] }) {
 
   return (
     <div
-      className="relative overflow-hidden rounded-panel border"
+      className="relative overflow-hidden border"
       style={{
-        borderColor: "var(--color-line)",
+        borderColor: "var(--color-rule)",
         background: "#0e2a1d",
         aspectRatio: "3 / 4",
         minHeight: "22rem",

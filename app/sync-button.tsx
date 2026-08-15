@@ -12,7 +12,7 @@ import { quickSyncAction, type QuickSyncState } from "./sync-actions";
  *
  * El resultado se enseña de dos formas porque el sitio manda: en escritorio
  * cabe al lado del botón, y en móvil no, así que sale como aviso flotante
- * por encima de la barra de navegación. Truncar el mensaje a puntos
+ * por encima de la tira de secciones. Truncar el mensaje a puntos
  * suspensivos sería enseñar que ha pasado algo sin decir qué.
  */
 export function SyncButton() {
@@ -22,16 +22,16 @@ export function SyncButton() {
   );
 
   return (
-    <form action={action} className="flex items-center gap-2.5">
+    <form action={action} className="flex items-center gap-3">
       {state && (
         <span
-          className="hidden max-w-[22rem] items-center gap-1.5 truncate text-[12px] lg:inline-flex"
+          className="hidden max-w-[24rem] items-center gap-2 truncate font-mono text-[11px] lg:inline-flex"
           style={{ color: state.ok ? "var(--color-muted)" : "var(--color-bad)" }}
           title={state.message}
         >
           <span
             aria-hidden
-            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            className="h-1.5 w-1.5 shrink-0"
             style={{
               background: state.ok ? "var(--color-good)" : "var(--color-bad)",
             }}
@@ -44,17 +44,16 @@ export function SyncButton() {
         type="submit"
         disabled={pending}
         aria-busy={pending}
-        className="press inline-flex h-9 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-[13px] font-medium text-ink disabled:cursor-progress disabled:opacity-60"
+        className="press inline-flex h-9 items-center gap-2 border border-line-strong px-3 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-ink disabled:cursor-progress disabled:opacity-60"
       >
         <svg
-          width="14"
-          height="14"
+          width="12"
+          height="12"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          strokeWidth="2.5"
+          strokeLinecap="square"
           aria-hidden
           className={pending ? "animate-spin" : ""}
           style={{ color: "var(--color-brand-ink)" }}
@@ -62,22 +61,20 @@ export function SyncButton() {
           <path d="M21 12a9 9 0 1 1-2.64-6.36" />
           <path d="M21 3v6h-6" />
         </svg>
-        <span className="hidden sm:inline">
-          {pending ? "Sincronizando" : "Sincronizar"}
-        </span>
+        {pending ? "Leyendo" : "Sincronizar"}
       </button>
 
-      {/* En móvil, flotando sobre la barra inferior y con el mensaje entero. */}
+      {/* En móvil, flotando sobre la tira inferior y con el mensaje entero. */}
       {state && (
         <p
           role="status"
-          className="fixed inset-x-3 z-40 rounded-control border border-line bg-surface px-3 py-2.5 text-[12px] leading-snug shadow-lg lg:hidden"
+          className="fixed inset-x-3 z-40 border bg-canvas px-3 py-2.5 text-[12px] leading-snug lg:hidden"
           style={{
-            bottom: "calc(env(safe-area-inset-bottom) + 4.75rem)",
+            bottom: "calc(env(safe-area-inset-bottom) + 4rem)",
             color: state.ok ? "var(--color-muted)" : "var(--color-bad)",
             borderColor: state.ok
-              ? "var(--color-line)"
-              : "color-mix(in oklab, var(--color-bad) 40%, var(--color-line))",
+              ? "var(--color-line-strong)"
+              : "var(--color-bad)",
           }}
         >
           {state.message}

@@ -9,7 +9,6 @@ import {
   Input,
   Notice,
   Output,
-  Panel,
   Table,
   Td,
   Th,
@@ -111,7 +110,7 @@ function Result({ state }: { state: SyncState }) {
 
       {state.shape && (
         <Disclosure summary="Informe de mapeo de campos">
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-control border border-line p-3 font-mono text-[11px] leading-relaxed">
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap border border-line p-3 font-mono text-[11px] leading-relaxed">
             {state.shape}
           </pre>
         </Disclosure>
@@ -132,11 +131,9 @@ export function DiagnoseForm() {
   >(diagnoseAction, null);
 
   return (
-    <Panel className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
-          Diagnosticar la API
-        </h2>
+    <section className="rule-heavy space-y-4 pt-3">
+      <div className="space-y-1.5">
+        <h2 className="slug text-ink">Diagnosticar la API</h2>
         <p className="text-[13px] leading-relaxed text-muted">
           Si la sincronización falla con un 404 o un 401, esto dice dónde está
           el problema en vez de dejarte probando a ciegas.
@@ -190,13 +187,13 @@ export function DiagnoseForm() {
                 que son los que hay que poner en <code>FANTASY_LEAGUE_ID</code> y{" "}
                 <code>FANTASY_TEAM_ID</code>.
               </p>
-              <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-control border border-line p-3 font-mono text-[11px] leading-relaxed">
+              <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap border border-line p-3 font-mono text-[11px] leading-relaxed">
                 {state.me}
               </pre>
             </Disclosure>
           )}
         </div>
       )}
-    </Panel>
+    </section>
   );
 }

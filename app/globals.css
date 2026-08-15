@@ -7,13 +7,12 @@
  * terceros, ni un salto de fuente a media carga, ni una dependencia de
  * red en el build.
  *
- * Archivo es una grotesca de origen editorial con eje de anchura, que es
- * justo lo que pide un producto de tablas y marcadores: se estrecha para
- * las cifras grandes sin cambiar de familia.
+ * Archivo tiene eje de anchura, y aquí se usa de verdad: los titulares y
+ * las cifras van estrechados al 78-85%, como en una página de resultados
+ * impresa, donde el ancho de columna manda sobre el cuerpo de la letra.
  *
  * IBM Plex Mono se reserva a lo que tiene que alinearse o leerse como
- * dato: columnas de dinero, etiquetas, códigos. Un producto de números
- * gana más con dos voces claras que con una sola bien intencionada.
+ * dato: columnas de dinero, rótulos y códigos.
  * ==================================================================== */
 
 @font-face {
@@ -68,15 +67,18 @@
 /* ==================================================================== *
  * TOKENS
  *
- * El tema base es el claro —papel de cuaderno, cálido, no blanco de
- * pantalla— y el oscuro es el mismo sistema con la tinta invertida:
- * verde muy apagado, del color de un campo de noche.
+ * Papel y tinta. El tema claro es papel de periódico —cálido, nunca
+ * blanco de pantalla— con tinta casi negra; el oscuro es el mismo
+ * sistema al revés, con un negro de verde muy apagado.
  *
- * Los nombres dicen para qué sirve cada color, no de qué color es:
- * `--color-raised` sobrevive a repintar la app entera; `--color-zinc-100`
- * no. El acento (lima de foco de estadio) es un **relleno**, no un color
- * de texto: sobre él siempre va tinta. Para texto de marca existe
- * `--color-brand-ink`, que en claro baja a oliva para poder leerse.
+ * Aquí la superficie apenas se distingue del fondo **a propósito**: lo
+ * que separa las cosas son las reglas, no las cajas. Un producto de
+ * tablas no necesita treinta tarjetas flotando; necesita filetes.
+ *
+ * El acento existe pero se raciona: bandera de la sección activa, botón
+ * principal, la cifra que contesta la pregunta de la pantalla, y la
+ * banda de incertidumbre. Nada más. Un acento en todas partes es un
+ * acento en ninguna.
  * ==================================================================== */
 
 @theme {
@@ -84,80 +86,78 @@
     sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* Superficies, de la más al fondo a la más cerca. */
-  --color-canvas: #f2f1ea;
-  --color-surface: #fbfaf5;
-  --color-raised: #ebe9df;
-  --color-sunken: #e4e2d6;
+  --color-canvas: #f4f2ea;
+  --color-surface: #faf8f2;
+  --color-raised: #e9e6da;
+  --color-sunken: #e2dfd1;
 
-  --color-line: #dbd8ca;
-  --color-line-strong: #c4c0ae;
+  --color-line: #d8d4c4;
+  --color-line-strong: #b4af9c;
+  /* La regla gruesa que abre cada sección. Es tinta, no gris. */
+  --color-rule: #1a1d19;
 
-  --color-ink: #141a16;
-  --color-muted: #59635c;
-  --color-faint: #6b736c;
+  --color-ink: #141714;
+  --color-muted: #545c53;
+  --color-faint: #6f7669;
 
   --color-brand: #c9f24b;
   --color-on-brand: #101a08;
-  --color-brand-ink: #3c6410;
-  /* Relleno de las bandas de incertidumbre: la lima pura sobre papel se
-     pierde, y sobre tinta deslumbra. Cada tema lleva la suya. */
+  --color-brand-ink: #3a6210;
   --color-band: #c2e75f;
 
   --color-good: #0f7d58;
-  --color-warn: #9a5804;
-  --color-bad: #bb3527;
-
-  --radius-panel: 14px;
-  --radius-control: 10px;
+  --color-warn: #8f5304;
+  --color-bad: #b62f22;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-canvas: #0a0e0c;
-    --color-surface: #101613;
-    --color-raised: #18211d;
-    --color-sunken: #070a09;
+    --color-canvas: #0b0d0c;
+    --color-surface: #101312;
+    --color-raised: #171b19;
+    --color-sunken: #060807;
 
-    --color-line: #212d27;
-    --color-line-strong: #2f3e37;
+    --color-line: #232725;
+    --color-line-strong: #3a413d;
+    --color-rule: #d8ded6;
 
-    --color-ink: #e9efea;
-    --color-muted: #a2aea7;
-    --color-faint: #8d9a93;
+    --color-ink: #edefea;
+    --color-muted: #9ca69f;
+    --color-faint: #838d85;
 
     --color-brand: #c9f24b;
-    --color-on-brand: #0a0e0c;
+    --color-on-brand: #0b0d0c;
     --color-brand-ink: #c9f24b;
     --color-band: #4f6d23;
 
-    --color-good: #56d6a0;
-    --color-warn: #f0b440;
-    --color-bad: #ff8272;
+    --color-good: #4ecf9a;
+    --color-warn: #e8ac3c;
+    --color-bad: #f9776a;
   }
 }
 
 :root[data-theme="dark"] {
-  --color-canvas: #0a0e0c;
-  --color-surface: #101613;
-  --color-raised: #18211d;
-  --color-sunken: #070a09;
+  --color-canvas: #0b0d0c;
+  --color-surface: #101312;
+  --color-raised: #171b19;
+  --color-sunken: #060807;
 
-  --color-line: #212d27;
-  --color-line-strong: #2f3e37;
+  --color-line: #232725;
+  --color-line-strong: #3a413d;
+  --color-rule: #d8ded6;
 
-  --color-ink: #e9efea;
-  --color-muted: #a2aea7;
-  --color-faint: #8d9a93;
+  --color-ink: #edefea;
+  --color-muted: #9ca69f;
+  --color-faint: #838d85;
 
   --color-brand: #c9f24b;
-  --color-on-brand: #0a0e0c;
+  --color-on-brand: #0b0d0c;
   --color-brand-ink: #c9f24b;
   --color-band: #4f6d23;
 
-  --color-good: #56d6a0;
-  --color-warn: #f0b440;
-  --color-bad: #ff8272;
+  --color-good: #4ecf9a;
+  --color-warn: #e8ac3c;
+  --color-bad: #f9776a;
 }
 
 /* ==================================================================== *
@@ -184,39 +184,62 @@ body {
   @apply antialiased;
 }
 
-/* Un anillo de foco propio, del color de la marca y visible sobre las dos
-   tintas. El del navegador desaparece sobre el fondo oscuro. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--color-brand) 35%, transparent);
+  background: color-mix(in oklab, var(--color-brand) 40%, transparent);
   color: var(--color-ink);
 }
 
-/* La barra de desplazamiento también es interfaz. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-line-strong) transparent;
 }
 
 /* ==================================================================== *
- * UTILIDADES DEL SISTEMA
+ * VOCES TIPOGRÁFICAS
  * ==================================================================== */
 
 /**
- * Etiqueta de instrumento: mono, versalitas, muy espaciada. Es la voz con
- * la que la app nombra los datos, y por eso no se usa para nada más.
+ * Titular. Estrechado y muy apretado, como un rótulo de portada. El
+ * `clamp` lo deja crecer con la pantalla sin puntos de ruptura: en un
+ * móvil es un titular, en un monitor es una cabecera de periódico.
+ */
+.display {
+  font-stretch: 80%;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 0.94;
+  font-size: clamp(2.25rem, 1.4rem + 3.4vw, 3.75rem);
+}
+
+/**
+ * Rótulo de sección: la línea de texto que se apoya sobre la regla
+ * gruesa. Estrecho, en versalitas y con peso, como el nombre de una
+ * sección en una página de resultados.
+ */
+.slug {
+  font-stretch: 82%;
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+/**
+ * Etiqueta de instrumento: mono, versalitas, muy espaciada. Es la voz
+ * con la que la app nombra los datos, y por eso no se usa para nada más.
  */
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1.4;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--color-faint);
 }
@@ -227,46 +250,66 @@ body {
 }
 
 /**
- * Cifra de marcador. El eje de anchura de Archivo se estrecha para que un
- * número largo siga cabiendo sin encoger el cuerpo, que es como se resuelve
- * en un panel de estadio y no en una hoja de cálculo.
+ * Cifra de marcador. El eje de anchura se estrecha para que un número
+ * largo siga cabiendo sin encoger el cuerpo, que es como se resuelve en
+ * un panel de estadio y no en una hoja de cálculo.
  */
 .scoreline {
   font-variant-numeric: tabular-nums;
-  font-stretch: 88%;
-  letter-spacing: -0.02em;
+  font-stretch: 78%;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 0.95;
 }
 
 /** La unidad acompaña a la cifra, no compite con ella. */
 .unit {
   font-family: var(--font-mono);
-  font-size: 0.68em;
+  font-size: 0.62em;
   font-weight: 500;
   color: var(--color-faint);
   letter-spacing: 0.02em;
 }
 
-/**
- * Marca de sección. Dos píxeles de lima a la izquierda del título: es el
- * único adorno recurrente de la interfaz, y sirve para que la vista
- * encuentre dónde empieza cada bloque en una página larga de datos.
- */
-.tick::before {
-  content: "";
-  display: inline-block;
-  width: 3px;
-  height: 0.75em;
-  margin-right: 0.6em;
-  vertical-align: baseline;
-  background: var(--color-brand);
-  border-radius: 1px;
+/* ==================================================================== *
+ * REGLAS
+ *
+ * El sistema entero se sostiene sobre dos filetes: uno grueso de tinta
+ * que abre sección, y uno fino que separa filas. No hay sombras ni
+ * cajas flotantes en ninguna parte.
+ * ==================================================================== */
+
+.rule-heavy {
+  border-top: 2px solid var(--color-rule);
+}
+
+.rule {
+  border-top: 1px solid var(--color-line);
 }
 
 /**
+ * Cuadratín de sección: el cuadradito de acento que se apoya en el
+ * extremo izquierdo de la regla gruesa. Es la única firma recurrente de
+ * la interfaz.
+ */
+.quad::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 22px;
+  height: 2px;
+  background: var(--color-brand);
+}
+
+/* ==================================================================== *
+ * UTILIDADES
+ * ==================================================================== */
+
+/**
  * Las tablas anchas se desplazan dentro de su caja, nunca empujan la
- * página. En un móvil de 375px una tabla de siete columnas rompe el layout
- * entero si no se contiene aquí. El degradado del borde derecho avisa de
- * que hay más columnas fuera de pantalla.
+ * página. En un móvil de 375px una tabla de siete columnas rompe el
+ * layout entero si no se contiene aquí.
  */
 .table-scroll {
   @apply overflow-x-auto;
@@ -293,15 +336,14 @@ body {
 code {
   font-family: var(--font-mono);
   font-size: 0.86em;
-  padding: 0.1em 0.35em;
-  border-radius: 4px;
+  padding: 0.1em 0.3em;
   background: var(--color-raised);
   color: var(--color-ink);
 }
 
 /**
- * El `<details>` nativo trae un triángulo que no combina con nada. Se quita
- * aquí una vez en lugar de en cada uso.
+ * El `<details>` nativo trae un triángulo que no combina con nada. Se
+ * quita aquí una vez en lugar de en cada uso.
  */
 summary {
   list-style: none;
@@ -315,15 +357,14 @@ summary::-webkit-details-marker {
 @keyframes pulse-soft {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.5;
   }
   50% {
-    opacity: 0.25;
+    opacity: 0.22;
   }
 }
 .skeleton {
   background: var(--color-raised);
-  border-radius: 6px;
   animation: pulse-soft 1.6s ease-in-out infinite;
 }
 

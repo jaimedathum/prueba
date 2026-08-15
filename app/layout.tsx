@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { MobileTabs, OverflowMenu, Sidebar, Wordmark } from "./nav";
+import { MobileTabs, OverflowMenu, SectionStrip, Wordmark } from "./nav";
 import { SyncButton } from "./sync-button";
 
 export const metadata: Metadata = {
@@ -27,8 +27,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f1ea" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0e0c" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f2ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0d0c" },
   ],
 };
 
@@ -42,13 +42,14 @@ export const viewport: Viewport = {
 const THEME_SCRIPT = `try{var t=localStorage.getItem('fa-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t}}catch(e){}`;
 
 /**
- * Estructura de la app.
+ * Estructura de la app: una cabecera de periódico y una columna de texto.
  *
- * Dos formas distintas para dos usos distintos. En el móvil —que es donde
- * se consulta, de pie y con una mano, mientras se mira la app oficial— la
- * navegación va abajo y la cabecera se queda con lo único imprescindible:
- * sincronizar. En escritorio, donde se analiza sentado, aparece una columna
- * fija con los destinos agrupados por la pregunta que responden.
+ * Arriba el nombre con las acciones que se repiten, debajo la regla
+ * gruesa, y apoyada en ella la tira de secciones. El contenido va a lo
+ * ancho, sin columna lateral, porque lo que hay dentro son tablas y
+ * campos, y el ancho es el recurso escaso de esta app.
+ *
+ * En móvil la tira de secciones baja al pie, al alcance del pulgar.
  */
 export default function RootLayout({
   children,
@@ -75,26 +76,24 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body>
-        <Sidebar />
-
-        <div className="lg:pl-[248px]">
-          <header className="sticky top-0 z-30 border-b border-line bg-[color-mix(in_oklab,var(--color-canvas)_88%,transparent)] backdrop-blur-md">
-            <div className="mx-auto flex max-w-[1120px] items-center gap-3 px-4 py-2.5 lg:px-8">
-              {/* En escritorio la marca ya está en la columna izquierda. */}
-              <div className="lg:hidden">
-                <Wordmark />
-              </div>
+        <header className="sticky top-0 z-30 border-b border-line bg-canvas">
+          <div className="mx-auto max-w-[1180px] px-4 lg:px-8">
+            <div className="flex items-center gap-4 py-3">
+              <Wordmark />
               <div className="ml-auto flex items-center gap-2">
                 <SyncButton />
                 <OverflowMenu />
               </div>
             </div>
-          </header>
-
-          {/* El relleno inferior deja sitio a la barra de navegación fija. */}
-          <div className="mx-auto max-w-[1120px] px-4 py-6 pb-28 lg:px-8 lg:py-9 lg:pb-12">
-            {children}
+            <div className="rule-heavy">
+              <SectionStrip />
+            </div>
           </div>
+        </header>
+
+        {/* El relleno inferior deja sitio a la tira fija del móvil. */}
+        <div className="mx-auto max-w-[1180px] px-4 py-7 pb-28 lg:px-8 lg:py-10 lg:pb-14">
+          {children}
         </div>
 
         <MobileTabs />

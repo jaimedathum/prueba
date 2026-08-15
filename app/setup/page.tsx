@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { checkSetupEnv } from "@/lib/setup-status";
-import { Badge, Notice, Page, Panel } from "../ui";
+import { Badge, Notice, Page } from "../ui";
 import { DiagnoseForm, SyncForm } from "./sync-form";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export default function SetupPage() {
   const faltan = checks.filter((check) => !check.ok);
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="max-w-2xl">
       <Page
         eyebrow="Sistema"
         title="Puesta en marcha"
@@ -104,8 +104,12 @@ export default function SetupPage() {
 }
 
 /**
- * Un paso del arranque. El número va fuera de la caja, en una columna
- * propia, para que se lea la secuencia antes que el contenido.
+ * Un paso del arranque.
+ *
+ * El número va grande y colgando a la izquierda, fuera de la columna de
+ * contenido: así la secuencia se lee antes que lo que hay dentro de cada
+ * paso, que es justo el error del que salen la mitad de los atascos
+ * —intentar sincronizar antes de haber iniciado sesión—.
  */
 function Step({
   number,
@@ -119,27 +123,22 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex gap-3.5 sm:gap-5">
-      <div
-        aria-hidden
-        className="scoreline hidden w-8 shrink-0 pt-3 text-right text-[26px] font-semibold leading-none text-line-strong sm:block"
-      >
-        {number}
+    <section className="rule-heavy pt-3">
+      <div className="flex items-baseline gap-4">
+        <span
+          aria-hidden
+          className="scoreline w-9 shrink-0 text-[32px] text-line-strong"
+        >
+          {String(number).padStart(2, "0")}
+        </span>
+        <h2 className="slug flex-1 text-ink">{title}</h2>
+        {status && (
+          <Badge tone={status === "listo" ? "good" : "bad"}>
+            {status === "listo" ? "correcta" : "incompleta"}
+          </Badge>
+        )}
       </div>
-      <Panel className="min-w-0 flex-1 space-y-3.5">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
-            <span className="mr-1.5 text-faint sm:hidden">{number}.</span>
-            {title}
-          </h2>
-          {status && (
-            <Badge tone={status === "listo" ? "good" : "bad"}>
-              {status === "listo" ? "correcta" : "incompleta"}
-            </Badge>
-          )}
-        </div>
-        {children}
-      </Panel>
+      <div className="mt-4 space-y-4 sm:pl-[3.25rem]">{children}</div>
     </section>
   );
 }
