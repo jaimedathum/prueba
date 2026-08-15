@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { MobileTabs, OverflowMenu, SectionStrip, Wordmark } from "./nav";
+import { SupportBand } from "./support";
 import { SyncButton } from "./sync-button";
 
 export const metadata: Metadata = {
@@ -91,9 +92,15 @@ export default function RootLayout({
           </div>
         </header>
 
-        {/* El relleno inferior deja sitio a la tira fija del móvil. */}
-        <div className="mx-auto max-w-[1180px] px-4 py-7 pb-28 lg:px-8 lg:py-10 lg:pb-14">
+        <div className="mx-auto max-w-[1180px] px-4 py-7 lg:px-8 lg:py-10">
           {children}
+        </div>
+
+        {/* El colofón: quién paga esto y el hueco del anuncio. Va al final,
+            fuera del contenido, y el relleno de abajo deja sitio a la tira
+            fija del móvil. */}
+        <div className="pb-28 lg:pb-14">
+          <SupportBand />
         </div>
 
         <MobileTabs />

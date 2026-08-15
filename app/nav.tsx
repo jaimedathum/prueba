@@ -3,6 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {
+  AjustesIcon,
+  ApoyoIcon,
+  CorreccionesIcon,
+  MercadoIcon,
+  OnceIcon,
+  PlantillaIcon,
+  RiesgoIcon,
+  RivalesIcon,
+} from "./icons";
+import { DONATE_URL } from "./support-config";
 
 /**
  * Navegación.
@@ -14,12 +25,12 @@ import { useEffect, useRef, useState } from "react";
  * mismo era pagar ancho de tabla por comodidad de nadie.
  *
  * En móvil la tira baja al pie, fija, porque es donde llega el pulgar de
- * quien consulta esto de pie mientras mira la app oficial.
+ * quien consulta esto de pie mientras mira la app oficial, y ahí el
+ * pictograma sí trabaja: se reconoce de reojo y sin leer.
  *
- * Sin iconos, a propósito. Cinco destinos que se llaman Plantilla, Once,
- * Mercado, Rivales y Riesgo no ganan nada con un pictograma al lado: el
- * icono de librería es ruido, y encima es lo que hace que todas las
- * aplicaciones se parezcan entre sí.
+ * Los iconos son propios (`app/icons.tsx`) y hablan el idioma del resto de
+ * la página —filete de cabo cuadrado y marca sólida—, no el trazo
+ * redondeado de librería que llevan todas las aplicaciones.
  */
 
 interface Destino {
@@ -28,22 +39,50 @@ interface Destino {
   short: string;
   /** Etiqueta larga, para el menú y los sitios con espacio. */
   label: string;
+  icon: (props: { size?: number }) => React.ReactElement;
 }
 
-const SQUAD: Destino = { href: "/", short: "Plantilla", label: "Mi plantilla" };
-const LINEUP: Destino = { href: "/alineacion", short: "Once", label: "Alineación" };
-const MARKET: Destino = { href: "/mercado", short: "Mercado", label: "Mercado y pujas" };
-const RIVALS: Destino = { href: "/rivales", short: "Rivales", label: "Rivales" };
-const RISK: Destino = { href: "/riesgo", short: "Riesgo", label: "Riesgo y cláusulas" };
+const SQUAD: Destino = {
+  href: "/",
+  short: "Plantilla",
+  label: "Mi plantilla",
+  icon: PlantillaIcon,
+};
+const LINEUP: Destino = {
+  href: "/alineacion",
+  short: "Once",
+  label: "Alineación",
+  icon: OnceIcon,
+};
+const MARKET: Destino = {
+  href: "/mercado",
+  short: "Mercado",
+  label: "Mercado y pujas",
+  icon: MercadoIcon,
+};
+const RIVALS: Destino = {
+  href: "/rivales",
+  short: "Rivales",
+  label: "Rivales",
+  icon: RivalesIcon,
+};
+const RISK: Destino = {
+  href: "/riesgo",
+  short: "Riesgo",
+  label: "Riesgo y cláusulas",
+  icon: RiesgoIcon,
+};
 const OVERRIDES: Destino = {
   href: "/overrides",
   short: "Correcciones",
   label: "Correcciones manuales",
+  icon: CorreccionesIcon,
 };
 const SETUP: Destino = {
   href: "/setup",
   short: "Ajustes",
   label: "Puesta en marcha",
+  icon: AjustesIcon,
 };
 
 /** Los cinco que caben cómodos en 375px sin cortar etiquetas. */
@@ -142,7 +181,7 @@ function StripLink({
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className="relative px-3.5 py-2.5 font-sans no-underline transition-colors first:pl-0"
+      className="relative flex items-center gap-2 px-3.5 py-2.5 font-sans no-underline transition-colors first:pl-0"
       style={{
         fontStretch: "82%",
         fontSize: quiet ? "11px" : "12.5px",
@@ -168,6 +207,7 @@ function StripLink({
           transform: active ? "scaleX(1)" : "scaleX(0)",
         }}
       />
+      <item.icon size={quiet ? 12 : 14} />
       {item.short}
     </Link>
   );
@@ -197,7 +237,7 @@ export function MobileTabs() {
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className="tap relative flex items-center justify-center px-1 text-center no-underline"
+            className="tap relative flex flex-col items-center justify-center gap-1.5 px-1 py-2 text-center no-underline"
             style={{
               fontStretch: "80%",
               fontSize: "11px",
@@ -215,6 +255,7 @@ export function MobileTabs() {
                 transform: active ? "scaleX(1)" : "scaleX(0)",
               }}
             />
+            <item.icon size={17} />
             {item.short}
           </Link>
         );
@@ -277,8 +318,9 @@ export function OverflowMenu() {
                 href={item.href}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="tap flex items-center border-b border-line text-[13px] font-medium text-muted no-underline transition-colors last:border-b-0 hover:text-ink"
+                className="tap flex items-center gap-2.5 border-b border-line text-[13px] font-medium text-muted no-underline transition-colors last:border-b-0 hover:text-ink"
               >
+                <item.icon size={14} />
                 {item.label}
               </Link>
             ))}
@@ -286,6 +328,22 @@ export function OverflowMenu() {
           </div>
           <p className="eyebrow hidden pb-1.5 lg:block">Aspecto</p>
           <ThemeChoices onPick={() => setOpen(false)} />
+
+          {DONATE_URL && (
+            <>
+              <p className="eyebrow pb-1.5 pt-4">Este proyecto</p>
+              <a
+                href={DONATE_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                onClick={() => setOpen(false)}
+                className="tap flex items-center gap-2.5 text-[13px] font-medium text-muted no-underline transition-colors hover:text-ink"
+              >
+                <ApoyoIcon size={14} />
+                Invitar a un café
+              </a>
+            </>
+          )}
         </div>
       )}
     </div>
