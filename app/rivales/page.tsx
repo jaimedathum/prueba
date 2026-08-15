@@ -1,39 +1,28 @@
-import { getRivalsDashboard } from "@/lib/engine/rivals-load";
+import Link from "next/link";
 import { formatMoney } from "@/lib/queries";
-import { positionCode } from "@/lib/domain/positions";
 import { SetupNotice } from "../setup-notice";
-import { Pitch } from "../pitch";
-import {
-  Disclosure,
-  Empty,
-  Figure,
-  Notice,
-  Page,
-  RangeBar,
-  Row,
-  Section,
-  Stat,
-  Table,
-  Td,
-  Th,
-} from "../ui";
+import { Empty, Notice, Page, RangeBar, Section, Table, Td, Th } from "../ui";
+import { getLeague } from "./data";
 
 export const dynamic = "force-dynamic";
 
 /**
- * La liga rival a rival.
+ * La liga, de un vistazo.
  *
- * `/riesgo` responde a "¿cuán expuesto estoy?" mirando tu plantilla. Esto
- * responde a "¿qué hago con este?" mirando la suya, que es la pregunta que
- * uno se hace de verdad antes de gastar dinero.
+ * Antes esta pantalla lo enseñaba todo de todos: diez fichas completas, con
+ * su plantilla, su libro de cuentas y su once, una detrás de otra. Servía
+ * para husmear, no para decidir, y obligaba a desplazarse metros para
+ * comparar dos managers.
  *
- * Van ordenados por la caja estimada, no por el techo de su banda: un techo
- * alto puede venir solo de que se sabe poco, y desconocimiento no es amenaza.
+ * Ahora el índice contesta a "¿de quién me tengo que preocupar?" —caja,
+ * potencial y cuántos de los suyos me compensa clausular— y el detalle de
+ * cada uno vive en su propia dirección, que además se puede compartir y
+ * volver a abrir.
  */
 export default async function RivalesPage() {
   let data;
   try {
-    data = await getRivalsDashboard();
+    data = await getLeague();
   } catch (error) {
     return (
       <SetupNotice
@@ -56,8 +45,9 @@ export default async function RivalesPage() {
   const { rivals, standings, nextMatchday, warnings } = data;
 
   // Todas las bandas se dibujan contra el mismo techo; si no, una barra
-  // llena querría decir cosas distintas en cada ficha.
+  // llena querría decir cosas distintas en cada fila.
   const cashScale = Math.max(1, ...rivals.map((rival) => rival.cash.max));
+  const amenazas = rivals.filter((rival) => rival.targets.length > 0).length;
 
   return (
     <Page
@@ -66,6 +56,7 @@ export default async function RivalesPage() {
       subtitle="La caja de cada rival es una banda, no una cifra: se reconstruye movimiento a movimiento desde el feed de actividad, y cuando un movimiento no expone su importe la banda se ensancha en vez de inventarse un número."
       meta={[
         { label: "Equipos", value: rivals.length },
+        { label: "Con algo que quitarles", value: amenazas },
         { label: "Próxima jornada", value: nextMatchday ?? "—" },
       ]}
     >
@@ -81,7 +72,9 @@ export default async function RivalesPage() {
 
       <Section
         title={
-          nextMatchday ? `Proyección desde la jornada ${nextMatchday}` : "Proyección"
+          nextMatchday
+            ? `Proyección desde la jornada ${nextMatchday}`
+            : "Proyección"
         }
         hint="Puntos actuales más el mejor once repetido. La proyección supone que la plantilla no cambia y que todos alinean bien: a diez jornadas esto ordena, no predice."
       >
@@ -157,37 +150,40 @@ export default async function RivalesPage() {
         </Empty>
       ) : (
         <Section
-          title="Rival a rival"
+          title="Quién es quién"
           aside={`${rivals.length} equipos`}
-          hint="Lo que puede pagar, lo que puede alinear, y qué le sale a cuenta quitarle."
+          hint="Ordenados por la caja que se les estima, no por el techo de su banda: un techo alto puede venir solo de que se sabe poco, y desconocimiento no es amenaza. Pulsa en cualquiera para ver su ficha."
         >
-          <div className="border-t border-line">
-            {rivals.map((rival) => (
-              <article
-                key={rival.managerId}
-                className="space-y-5 border-b border-line py-6"
-              >
-                {/* Identidad y caja: lo primero que se mira de un rival. */}
-                <div className="flex flex-wrap items-start justify-between gap-x-10 gap-y-4">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-[20px] font-semibold tracking-[-0.02em]">
+          <ul className="border-t border-line">
+            {rivals.map((rival, index) => (
+              <li key={rival.managerId}>
+                <Link
+                  href={`/rivales/${encodeURIComponent(rival.managerId)}`}
+                  className="row-link -mx-2 flex items-center gap-4 border-b border-line px-2 py-4 no-underline"
+                >
+                  <span className="nums w-6 shrink-0 font-mono text-[11px] text-faint">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[16px] font-semibold tracking-[-0.015em]">
                       {rival.teamName}
-                    </h3>
-                    <p className="eyebrow mt-1">
+                    </span>
+                    <span className="eyebrow mt-1 block truncate">
                       {rival.managerName ?? "Manager sin nombre"} ·{" "}
                       {rival.observedMoves === 0
                         ? "sin historial"
-                        : `${rival.observedMoves} movimientos vistos`}
-                    </p>
-                  </div>
+                        : `${rival.observedMoves} movimientos`}
+                    </span>
+                  </span>
 
-                  <div className="min-w-[14rem] flex-1 sm:max-w-sm">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="eyebrow">Caja estimada</span>
-                      <span className="scoreline text-[18px]">
+                  <span className="hidden w-44 shrink-0 sm:block">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="eyebrow">Caja</span>
+                      <span className="scoreline text-[14px]">
                         {formatMoney(rival.cash.point)}
                       </span>
-                    </div>
+                    </span>
                     <RangeBar
                       min={rival.cash.min}
                       point={rival.cash.point}
@@ -195,207 +191,42 @@ export default async function RivalesPage() {
                       scaleMax={cashScale}
                       format={formatMoney}
                     />
-                    <p className="font-mono text-[10px] tracking-[0.06em] text-faint">
-                      SEGURO {formatMoney(rival.cash.min)} · TECHO{" "}
-                      {formatMoney(rival.cash.max)}
-                    </p>
-                  </div>
-                </div>
+                  </span>
 
-                <div className="grid grid-cols-2 gap-y-5 border-y border-line py-4 sm:grid-cols-4 sm:gap-0 sm:divide-x sm:divide-line sm:[&>*]:px-5 sm:[&>*:first-child]:pl-0">
-                  <Stat
-                    label="Patrimonio"
-                    value={formatMoney(rival.cash.point + rival.squadValue)}
-                    hint={`${formatMoney(rival.squadValue)} en jugadores`}
-                  />
-                  <Stat
-                    label="Su mejor once"
-                    value={rival.bestElevenPoints.toFixed(1)}
-                    hint={rival.formation ?? "sin once posible"}
-                  />
-                  <Stat label="Plantilla" value={rival.squad.length} />
-                  <Stat
-                    label="Le sale a cuenta quitarle"
-                    value={rival.targets.length}
-                    hint={
-                      rival.targets.length === 0 ? "nada compensa hoy" : "jugadores"
-                    }
-                  />
-                </div>
+                  <span className="hidden w-20 shrink-0 text-right md:block">
+                    <span className="eyebrow block">Mejor once</span>
+                    <span className="scoreline mt-1 block text-[16px]">
+                      {rival.bestElevenPoints.toFixed(1)}
+                    </span>
+                  </span>
 
-                {rival.alerts.length > 0 && (
-                  <ul className="space-y-1.5">
-                    {rival.alerts.map((alert) => (
-                      <li
-                        key={alert}
-                        className="border-l-2 py-0.5 pl-3 text-[13px] leading-relaxed"
-                        style={{ borderColor: "var(--color-warn)" }}
-                      >
-                        {alert}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {rival.targets.length > 0 ? (
-                  <ul>
-                    {rival.targets.slice(0, 3).map((target) => (
-                      <li
-                        key={target.playerId}
-                        className="border-b border-line py-2.5 last:border-b-0"
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span>
-                            <strong className="text-[14px] font-medium">
-                              {target.name}
-                            </strong>{" "}
-                            <span className="eyebrow">
-                              cláusula {formatMoney(target.clause)}
-                            </span>
-                          </span>
-                          <Figure tone="brand" className="text-[14px]">
-                            +{formatMoney(target.netSurplus)}
-                          </Figure>
-                        </div>
-                        <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-muted">
-                          {target.reason}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-
-                <div>
-                  {rival.starters.length > 0 && (
-                    <Disclosure summary="Ver su mejor once sobre el campo">
-                      <div className="space-y-2 sm:max-w-xs">
-                        <Pitch players={rival.starters} />
-                        <p className="text-[12px] leading-relaxed text-faint">
-                          Es el mejor once que <strong>puede</strong> poner, no
-                          el que va a poner: no sabemos a quién alineará.
-                          Suponer que se equivoca sería regalarle ventaja al
-                          análisis.
-                        </p>
-                      </div>
-                    </Disclosure>
-                  )}
-
-                  {rival.movements.length > 0 && (
-                    <Disclosure
-                      summary={`Ver sus ${rival.movements.length} movimientos y cómo le quedó la caja`}
+                  <span className="w-16 shrink-0 text-right">
+                    <span className="eyebrow block">Quitarle</span>
+                    <span
+                      className="scoreline mt-1 block text-[16px]"
+                      style={{
+                        color:
+                          rival.targets.length > 0
+                            ? "var(--color-brand-ink)"
+                            : "var(--color-faint)",
+                      }}
                     >
-                      <Table>
-                        <thead>
-                          <tr>
-                            <Th>Cuándo</Th>
-                            <Th>Qué</Th>
-                            <Th align="right">Importe</Th>
-                            <Th align="right">Le queda</Th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rival.movements.map((m) => (
-                            <tr key={m.id}>
-                              <Td className="whitespace-nowrap font-mono text-[11px] text-faint">
-                                {m.occurredAt.toLocaleDateString("es-ES", {
-                                  day: "2-digit",
-                                  month: "short",
-                                })}
-                              </Td>
-                              <Td>
-                                {m.playerName ?? tipoLegible(m.type)}
-                                {m.playerName && (
-                                  <span className="eyebrow block">
-                                    {tipoLegible(m.type)}
-                                  </span>
-                                )}
-                              </Td>
-                              <Td align="right" numeric>
-                                <Figure
-                                  tone={
-                                    m.delta === null
-                                      ? "muted"
-                                      : m.delta < 0
-                                        ? "bad"
-                                        : "good"
-                                  }
-                                >
-                                  {m.delta === null
-                                    ? "sin importe"
-                                    : `${m.delta > 0 ? "+" : ""}${formatMoney(m.delta)}`}
-                                </Figure>
-                              </Td>
-                              <Td align="right" numeric>
-                                {formatMoney(m.balanceAfter)}
-                                {!m.certain && (
-                                  <span
-                                    className="ml-1 text-faint"
-                                    title="El feed no expone el importe: desde aquí la banda se ensancha."
-                                  >
-                                    ?
-                                  </span>
-                                )}
-                              </Td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                      <p className="mt-2.5 max-w-3xl text-[12px] leading-relaxed text-faint">
-                        Este es el libro de cuentas del que sale su caja
-                        estimada. Empieza en el presupuesto inicial y se le
-                        aplica cada operación. Una fila con <strong>?</strong> es
-                        un movimiento cuyo importe el feed no expone: a partir de
-                        ahí la banda se ensancha en vez de inventarse la cifra.
-                      </p>
-                    </Disclosure>
-                  )}
+                      {rival.targets.length}
+                    </span>
+                  </span>
 
-                  <Disclosure
-                    summary={`Ver su plantilla completa (${rival.squad.length})`}
+                  <span
+                    aria-hidden
+                    className="row-arrow shrink-0 font-mono text-[13px] text-faint"
                   >
-                    <ul className="sm:columns-2 sm:gap-10">
-                      {rival.squad
-                        .slice()
-                        .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
-                        .map((player) => (
-                          <Row key={player.playerId} className="break-inside-avoid">
-                            <span className="min-w-0 truncate text-[13px]">
-                              {player.name}{" "}
-                              <span className="font-mono text-[11px] uppercase text-faint">
-                                {positionCode(player.positionId)}
-                              </span>
-                            </span>
-                            <Figure className="shrink-0 text-[11px] text-faint">
-                              {formatMoney(player.marketValue)}
-                              {player.buyoutClause !== null && (
-                                <> · {formatMoney(player.buyoutClause)}</>
-                              )}
-                            </Figure>
-                          </Row>
-                        ))}
-                    </ul>
-                  </Disclosure>
-                </div>
-              </article>
+                    →
+                  </span>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </Section>
       )}
     </Page>
-  );
-}
-
-/** Los tipos internos del feed, en castellano. */
-function tipoLegible(type: string): string {
-  return (
-    {
-      market_purchase: "compra en el mercado",
-      market_sale: "venta al mercado",
-      clause_paid: "clausulazo pagado",
-      clause_received: "clausulazo recibido",
-      transfer_in: "fichaje",
-      transfer_out: "traspaso",
-      unknown: "movimiento sin clasificar",
-    }[type] ?? type
   );
 }

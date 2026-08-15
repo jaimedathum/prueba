@@ -423,6 +423,13 @@ export function RiskBar({
               background:
                 i <= score ? TONE_VAR[tone] : "var(--color-line-strong)",
               opacity: i <= score ? 1 : 0.4,
+              // Los tramos encendidos se trazan uno tras otro: la escala se
+              // lee como lo que es, una cuenta, y no como seis cuadrados.
+              transformOrigin: "left center",
+              animation:
+                i <= score
+                  ? `draw 260ms cubic-bezier(.22,.61,.36,1) ${i * 45}ms both`
+                  : undefined,
             }}
           />
         ))}
@@ -473,9 +480,16 @@ export function RangeBar({
       aria-label={`Entre ${format(min)} y ${format(max)}, estimado ${format(point)}`}
     >
       <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-line" />
+      {/* La banda crece desde el mínimo hacia el máximo. Es el único gesto
+          de la app que significa algo literal: así es como se mide. */}
       <span
-        className="absolute top-1/2 h-2 -translate-y-1/2"
-        style={{ left: pct(min), width, background: "var(--color-band)" }}
+        className="absolute top-1/2 h-2 origin-left -translate-y-1/2"
+        style={{
+          left: pct(min),
+          width,
+          background: "var(--color-band)",
+          animation: "draw 620ms cubic-bezier(.22,.61,.36,1) 120ms both",
+        }}
       />
       <span
         className="absolute top-1/2 h-4 w-px -translate-y-1/2"
@@ -483,7 +497,12 @@ export function RangeBar({
       />
       <span
         className="absolute top-1/2 h-4 w-[2px] -translate-x-1/2 -translate-y-1/2"
-        style={{ left: pct(point), background: "var(--color-ink)" }}
+        style={{
+          left: pct(point),
+          background: "var(--color-ink)",
+          // Llega cuando la banda ya ha terminado de crecer.
+          animation: "rise 260ms ease-out 620ms both",
+        }}
       />
     </div>
   );

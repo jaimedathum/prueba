@@ -279,8 +279,24 @@ body {
  * cajas flotantes en ninguna parte.
  * ==================================================================== */
 
+/**
+ * La regla gruesa no es un borde sino una barra propia, y es por el
+ * movimiento: un `border-top` no se puede dibujar, y una barra sí. Al
+ * entrar, cada regla se traza de izquierda a derecha, que es el gesto de
+ * entintar una página.
+ */
 .rule-heavy {
-  border-top: 2px solid var(--color-rule);
+  position: relative;
+}
+.rule-heavy::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  background: var(--color-rule);
+  transform-origin: left center;
+  animation: draw 560ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
 .rule {
@@ -290,16 +306,20 @@ body {
 /**
  * Cuadratín de sección: el cuadradito de acento que se apoya en el
  * extremo izquierdo de la regla gruesa. Es la única firma recurrente de
- * la interfaz.
+ * la interfaz, y entra un poco después que la regla para que se vea que
+ * se posa encima.
  */
 .quad::before {
   content: "";
   position: absolute;
-  top: -2px;
+  top: 0;
   left: 0;
+  z-index: 1;
   width: 22px;
   height: 2px;
   background: var(--color-brand);
+  transform-origin: left center;
+  animation: draw 320ms cubic-bezier(0.22, 0.61, 0.36, 1) 240ms both;
 }
 
 /* ==================================================================== *
@@ -368,11 +388,119 @@ summary::-webkit-details-marker {
   animation: pulse-soft 1.6s ease-in-out infinite;
 }
 
+/* ==================================================================== *
+ * MOVIMIENTO
+ *
+ * Tres gestos y ninguno más, todos tomados de lo que hace la app:
+ *
+ * - **Trazar**: las reglas y las barras se dibujan de izquierda a
+ *   derecha. Es entintar.
+ * - **Subir**: los bloques entran desde seis píxeles más abajo. Es pasar
+ *   la página.
+ * - **Medir**: las bandas de incertidumbre crecen desde su mínimo hasta
+ *   su máximo, que es literalmente lo que significan.
+ *
+ * Nada rebota, nada gira, ninguna cifra cuenta hacia arriba. Esto se usa
+ * para decidir con dinero: un número que se está animando es un número
+ * que todavía no se puede leer.
+ *
+ * Todo va en CSS y sin una línea de JavaScript, así que corre en el
+ * primer pintado y no espera a hidratar.
+ * ==================================================================== */
+
+@keyframes draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/**
+ * Los bloques de primer nivel de cada pantalla entran escalonados. El
+ * escalón es corto —45ms— porque no es un espectáculo: es un orden de
+ * lectura sugerido durante medio segundo.
+ */
+main > * {
+  animation: rise 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+main > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+main > *:nth-child(2) {
+  animation-delay: 45ms;
+}
+main > *:nth-child(3) {
+  animation-delay: 90ms;
+}
+main > *:nth-child(4) {
+  animation-delay: 135ms;
+}
+main > *:nth-child(5) {
+  animation-delay: 180ms;
+}
+main > *:nth-child(n + 6) {
+  animation-delay: 225ms;
+}
+
+/** Lo que se despliega baja desde arriba, como si se descolgara. */
+details[open] > *:not(summary) {
+  animation: drop 240ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/** Una fila sobre la que se puede pulsar tiene que responder al ratón. */
+.row-link {
+  transition:
+    background-color 140ms ease,
+    padding-left 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.row-link:hover {
+  background: var(--color-surface);
+}
+.row-link .row-arrow,
+.row-link .row-arrow-back {
+  transition: transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.row-link:hover .row-arrow {
+  transform: translateX(3px);
+}
+.row-link:hover .row-arrow-back {
+  transform: translateX(-3px);
+}
+
+tbody tr {
+  transition: background-color 140ms ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }

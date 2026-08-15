@@ -156,11 +156,17 @@ function StripLink({
             : "var(--color-muted)",
       }}
     >
-      {/* La bandera de la sección activa se apoya sobre la regla gruesa. */}
+      {/* La bandera de la sección activa se apoya sobre la regla gruesa y
+          se traza al llegar. Es una transición y no una animación de
+          entrada a propósito: así también se recoge al salir, y navegar
+          entre dos secciones se ve como un solo movimiento. */}
       <span
         aria-hidden
-        className="absolute inset-x-0 top-0 h-[3px] first:left-0"
-        style={{ background: active ? "var(--color-brand)" : "transparent" }}
+        className="absolute inset-x-0 top-0 h-[3px] origin-left transition-transform duration-300 ease-out"
+        style={{
+          background: "var(--color-brand)",
+          transform: active ? "scaleX(1)" : "scaleX(0)",
+        }}
       />
       {item.short}
     </Link>
@@ -203,9 +209,10 @@ export function MobileTabs() {
           >
             <span
               aria-hidden
-              className="absolute inset-x-0 -top-[2px] h-[3px]"
+              className="absolute inset-x-0 -top-[2px] h-[3px] origin-left transition-transform duration-300 ease-out"
               style={{
-                background: active ? "var(--color-brand)" : "transparent",
+                background: "var(--color-brand)",
+                transform: active ? "scaleX(1)" : "scaleX(0)",
               }}
             />
             {item.short}
