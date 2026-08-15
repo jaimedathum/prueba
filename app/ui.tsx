@@ -26,7 +26,7 @@ import type { ComponentProps, ReactNode } from "react";
  * Tonos
  * ------------------------------------------------------------------ */
 
-export type Tone = "good" | "warn" | "bad" | "muted" | "brand";
+export type Tone = "good" | "warn" | "bad" | "muted" | "brand" | "neutral";
 
 const TONE_VAR: Record<Tone, string> = {
   good: "var(--color-good)",
@@ -34,6 +34,9 @@ const TONE_VAR: Record<Tone, string> = {
   bad: "var(--color-bad)",
   muted: "var(--color-muted)",
   brand: "var(--color-brand-ink)",
+  // Tinta. Es el tono de todo lo que la app tiene que decir sin que sea ni
+  // un error ni una felicitación: un apunte al margen, no una alarma.
+  neutral: "var(--color-rule)",
 };
 
 export function toneColor(tone: Tone): string {
@@ -353,9 +356,16 @@ export function Badge({
 /**
  * Aviso. Se usa para lo que el usuario tiene que saber antes de decidir,
  * no para adornar: si sale demasiado, deja de leerse.
+ *
+ * Va en **tinta** por defecto, como una nota al margen de una página
+ * impresa, y no en ámbar. Esta app enseña sus supuestos y sus lagunas
+ * constantemente —es media tesis del producto—, así que casi todas las
+ * pantallas llevan uno: pintarlos de color de alarma convertía la
+ * honestidad en ruido y, de paso, gastaba el rojo y el ámbar que hacen
+ * falta para lo que sí es un error o una escala medida.
  */
 export function Notice({
-  tone = "warn",
+  tone = "neutral",
   title,
   children,
 }: {
@@ -744,7 +754,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
  * haya ido bien o mal, porque reescribirlo sería perder el dato.
  */
 export function Output({
-  tone = "muted",
+  tone = "neutral",
   children,
 }: {
   tone?: Tone;

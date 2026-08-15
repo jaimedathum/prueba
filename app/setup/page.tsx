@@ -63,7 +63,7 @@ export default function SetupPage() {
           </ul>
 
           {faltan.length > 0 && (
-            <Notice tone="warn" title="Si juras que están puestas">
+            <Notice title="Si juras que están puestas">
               Casi siempre es una de dos:{" "}
               <strong>se añadieron después del último despliegue</strong> —las
               variables solo entran en builds nuevos, hay que redesplegar—, o{" "}

@@ -80,7 +80,7 @@ export function SyncForm() {
 function Result({ state }: { state: SyncState }) {
   return (
     <div className="space-y-3">
-      <Output tone={state.ok ? "good" : "warn"}>{state.message}</Output>
+      <Output tone={state.ok ? "good" : "bad"}>{state.message}</Output>
 
       {state.stats && state.stats.length > 0 && (
         <ul>
@@ -99,7 +99,7 @@ function Result({ state }: { state: SyncState }) {
       )}
 
       {state.warnings && state.warnings.length > 0 && (
-        <Notice tone="warn" title={`Avisos (${state.warnings.length})`}>
+        <Notice title={`Avisos (${state.warnings.length})`}>
           <ul className="list-disc space-y-1 pl-4 marker:text-faint">
             {state.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
@@ -151,7 +151,7 @@ export function DiagnoseForm() {
 
       {state && (
         <div className="space-y-3">
-          <Output tone={state.ok ? "good" : "warn"}>{state.message}</Output>
+          <Output tone={state.ok ? "good" : "bad"}>{state.message}</Output>
 
           {state.results && state.results.length > 0 && (
             <Table>

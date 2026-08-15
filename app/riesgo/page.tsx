@@ -86,7 +86,7 @@ export default async function RiesgoPage() {
       </div>
 
       <Notice
-        tone={data.calibration.applied ? "good" : "warn"}
+        tone={data.calibration.applied ? "good" : "neutral"}
         title="Calibración del modelo"
       >
         <p>{data.calibration.note}</p>
@@ -170,7 +170,7 @@ export default async function RiesgoPage() {
         hint="Blindar cuesta dinero seguro para evitar una pérdida probable. Solo compensa cuando lo segundo pesa más que lo primero."
       >
         {data.shieldBlockedReason ? (
-          <Output tone="warn">{data.shieldBlockedReason}</Output>
+          <Output>{data.shieldBlockedReason}</Output>
         ) : (
           <>
             {data.shieldPlan && data.shieldPlan.actions.length > 0 ? (
@@ -254,7 +254,7 @@ export default async function RiesgoPage() {
                   {attack.reason}
                 </p>
                 {attack.fundingHarm > 0 ? (
-                  <p className="mt-1 text-[12px] leading-relaxed text-warn">
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted">
                     Le pondrías {formatMoney(attack.clause)} en la caja a{" "}
                     {data.managerNames.get(attack.ownerManagerId) ??
                       attack.ownerManagerId}
@@ -297,7 +297,7 @@ function Verdict({ verdict }: { verdict: string }) {
     shield: ["blindar", "bad"],
     "let-them-take-him": ["que se lo lleven", "good"],
     "no-need": ["sin riesgo", "muted"],
-    "not-worth-it": ["no compensa", "warn"],
+    "not-worth-it": ["no compensa", "muted"],
   };
   const [label, tone] = map[verdict] ?? [verdict, "muted"];
   return <Badge tone={tone}>{label}</Badge>;

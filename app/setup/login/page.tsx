@@ -78,7 +78,7 @@ function EnvPanel() {
   }
 
   return (
-    <Notice tone="warn" title="Falta configuración">
+    <Notice tone="bad" title="Falta configuración">
       <p>El login va a fallar hasta que se arregle.</p>
 
       <ul className="my-2.5 space-y-1">

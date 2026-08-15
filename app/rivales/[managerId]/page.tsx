@@ -146,7 +146,7 @@ export default async function RivalPage({ params }: Params) {
               <li
                 key={alert}
                 className="border-l-2 py-0.5 pl-3 text-[13px] leading-relaxed"
-                style={{ borderColor: "var(--color-warn)" }}
+                style={{ borderColor: "var(--color-rule)" }}
               >
                 {alert}
               </li>

@@ -51,7 +51,7 @@ export function InteractiveLogin() {
         </Button>
       </form>
 
-      {start && !start.ok && <Output tone="warn">{start.message}</Output>}
+      {start && !start.ok && <Output tone="bad">{start.message}</Output>}
 
       {start?.authorizeUrl && (
         <div className="space-y-3 border border-line bg-raised p-3.5">
@@ -96,7 +96,7 @@ export function InteractiveLogin() {
         </form>
       )}
 
-      {done && <Output tone={done.ok ? "good" : "warn"}>{done.message}</Output>}
+      {done && <Output tone={done.ok ? "good" : "bad"}>{done.message}</Output>}
     </section>
   );
 }
@@ -140,7 +140,7 @@ export function PasswordLogin() {
       </form>
 
       {state && (
-        <Output tone={state.ok ? "good" : "warn"}>{state.message}</Output>
+        <Output tone={state.ok ? "good" : "bad"}>{state.message}</Output>
       )}
     </section>
   );

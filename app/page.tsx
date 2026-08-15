@@ -80,7 +80,7 @@ export default async function Home() {
       )}
 
       {enRiesgo > 0 && (
-        <Notice tone="warn" title={`${enRiesgo} por debajo de su valor`}>
+        <Notice title={`${enRiesgo} por debajo de su valor`}>
           Esos jugadores le salen baratos a cualquiera que tenga caja. Lo que
           hay que hacer con cada uno está en{" "}
           <a className="underline underline-offset-2" href="/riesgo">
@@ -182,7 +182,7 @@ function Marcas({
     <>
       {row.overriddenFields.length > 0 && (
         <span title={`Corregido a mano: ${row.overriddenFields.join(", ")}`}>
-          <Badge tone="warn">manual</Badge>
+          <Badge tone="muted">manual</Badge>
         </span>
       )}
       {row.status !== "ok" && (

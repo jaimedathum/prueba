@@ -22,7 +22,7 @@ export function SetupNotice({ message }: { message: string }) {
         </p>
       </header>
 
-      <Output tone="warn">{message}</Output>
+      <Output tone="bad">{message}</Output>
 
       <section className="rule-heavy space-y-3 pt-3">
         <h2 className="slug">Sin terminal, recomendado</h2>

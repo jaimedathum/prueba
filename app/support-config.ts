@@ -20,11 +20,20 @@ function limpio(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+/** Quien lo escribe y lo mantiene. Va firmado: esto no es de una empresa. */
+export const GITHUB_USER = "JLS97";
+export const GITHUB_URL = `https://github.com/${GITHUB_USER}`;
+
 /** Adónde va quien quiera invitar a un café. Sin ella no se enseña el botón. */
 export const DONATE_URL = limpio(process.env.NEXT_PUBLIC_DONATE_URL);
 
-/** A quién escribe quien quiera anunciarse. Puede ser un mailto o una URL. */
-export const SPONSOR_CONTACT = limpio(process.env.NEXT_PUBLIC_SPONSOR_CONTACT);
+/**
+ * A quién escribe quien quiera anunciarse. Puede ser un mailto o una URL, y
+ * si no se configura ninguna se cae al perfil de GitHub: un hueco ofrecido
+ * al que no se puede contestar no sirve de nada.
+ */
+export const SPONSOR_CONTACT =
+  limpio(process.env.NEXT_PUBLIC_SPONSOR_CONTACT) ?? GITHUB_URL;
 
 export interface Sponsor {
   name: string;

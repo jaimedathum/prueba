@@ -1,5 +1,11 @@
 import { ApoyoIcon } from "./icons";
-import { DONATE_URL, SPONSOR, SPONSOR_CONTACT } from "./support-config";
+import {
+  DONATE_URL,
+  GITHUB_URL,
+  GITHUB_USER,
+  SPONSOR,
+  SPONSOR_CONTACT,
+} from "./support-config";
 
 /**
  * El pie de la publicación.
@@ -58,7 +64,18 @@ export function SupportBand() {
           className="flex flex-wrap justify-between gap-x-6 gap-y-1 border-t py-3.5"
           style={{ borderColor: "var(--color-line)" }}
         >
-          <p className="eyebrow">El motor calcula, la IA explica</p>
+          <p className="eyebrow">
+            Hecho por{" "}
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-muted underline underline-offset-2 hover:text-ink"
+            >
+              @{GITHUB_USER}
+            </a>{" "}
+            · El motor calcula, la IA explica
+          </p>
           <p className="eyebrow">Sin cuentas · sin cookies · sin rastreo</p>
         </div>
       </div>
@@ -133,17 +150,20 @@ function SponsorSlot() {
         Un anuncio de texto, sin scripts de terceros y sin rastrear a nadie.
         Solo un nombre, una frase y un enlace.
       </p>
-      {SPONSOR_CONTACT && (
-        <a
-          href={SPONSOR_CONTACT}
-          className="row-link -mx-1 mt-3 inline-flex items-center gap-1.5 px-1 no-underline"
-        >
-          <span className="eyebrow">Escríbeme</span>
-          <span aria-hidden className="row-arrow font-mono text-[11px] text-faint">
-            →
-          </span>
-        </a>
-      )}
+      <a
+        href={SPONSOR_CONTACT}
+        // Un mailto: abre el cliente de correo y no debe robar la pestaña;
+        // un perfil o una web, sí que se abre aparte.
+        {...(SPONSOR_CONTACT.startsWith("http")
+          ? { target: "_blank", rel: "noreferrer noopener" }
+          : {})}
+        className="row-link -mx-1 mt-3 inline-flex items-center gap-1.5 px-1 no-underline"
+      >
+        <span className="eyebrow">Escríbeme</span>
+        <span aria-hidden className="row-arrow font-mono text-[11px] text-faint">
+          →
+        </span>
+      </a>
     </div>
   );
 }
