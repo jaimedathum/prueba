@@ -1,6 +1,6 @@
-import { resolveTenant } from "@/lib/tenant";
+import { currentTenant } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { LOCKED_MESSAGE, hasAdminSession, requireAdminSession } from "@/lib/admin-gate";
 import { getDb } from "@/lib/db";
 import { manualOverrides } from "@/lib/db/schema";
@@ -90,7 +90,7 @@ async function saveOverride(formData: FormData): Promise<void> {
   }
 
   await setOverride({
-    accountId: (await resolveTenant()).accountId,
+    accountId: (await currentTenant()).accountId,
     entity,
     entityId,
     field,
@@ -106,7 +106,7 @@ async function removeOverride(formData: FormData): Promise<void> {
 
   if (!(await requireAdminSession()).ok) return;
 
-  const { accountId } = await resolveTenant();
+  const { accountId } = await currentTenant();
   await clearOverride(
     accountId,
     String(formData.get("entity") ?? ""),
@@ -122,11 +122,19 @@ export default async function OverridesPage() {
 
   let active;
   try {
+    const { accountId } = await currentTenant();
     const db = getDb();
     active = await db
       .select()
       .from(manualOverrides)
-      .where(eq(manualOverrides.active, true))
+      // El listado también va scopeado: enseñar las correcciones de otro sería
+      // filtrar qué jugadores le interesan y con qué valores los corrige.
+      .where(
+        and(
+          eq(manualOverrides.accountId, accountId),
+          eq(manualOverrides.active, true),
+        ),
+      )
       .orderBy(desc(manualOverrides.createdAt));
   } catch (error) {
     return (

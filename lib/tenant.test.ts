@@ -32,19 +32,25 @@ describe.skipIf(!CONNECTION)("aislamiento entre cuentas", () => {
     const postgres = (await import("postgres")).default;
     const { drizzle } = await import("drizzle-orm/postgres-js");
     const { migrate } = await import("drizzle-orm/postgres-js/migrator");
+    const { createTestDatabase } = await import("./test-db");
     const schema = await import("./db/schema");
 
-    const client = postgres(CONNECTION!, { max: 1, prepare: false });
-    await client.unsafe(
-      "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; DROP SCHEMA IF EXISTS drizzle CASCADE;",
-    );
+    // Base propia: vitest corre los ficheros en paralelo y compartirla con la
+    // otra prueba de integración las haría fallar a ratos.
+    disposable = await createTestDatabase("tenant");
+    process.env.DATABASE_URL = disposable.url;
+
+    const client = postgres(disposable.url, { max: 1, prepare: false });
     const db = drizzle(client);
     await migrate(db, { migrationsFolder: "./drizzle" });
     return { client, db, schema };
   }
 
+  let disposable: Awaited<
+    ReturnType<typeof import("./test-db").createTestDatabase>
+  >;
+
   beforeAll(async () => {
-    process.env.DATABASE_URL = CONNECTION;
     ({ client, db, schema } = await setup());
     overrides = await import("./overrides");
     tenant = await import("./tenant");
@@ -72,6 +78,7 @@ describe.skipIf(!CONNECTION)("aislamiento entre cuentas", () => {
 
   afterAll(async () => {
     await client?.end();
+    await disposable?.close();
   });
 
   it("cada cuenta conserva su equipo en la misma liga", async () => {

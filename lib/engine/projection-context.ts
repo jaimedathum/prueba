@@ -1,6 +1,8 @@
 import { asc, eq, isNotNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { matches, playerMatchStats } from "@/lib/db/schema";
+import { lineupPredictions, matches, playerMatchStats } from "@/lib/db/schema";
+import { consensusByPlayer, measuredAccuracies } from "@/lib/sources/registry";
+import type { ProbableLineupEntry } from "@/lib/sources/types";
 import {
   computePositionAverages,
   expectedPoints,
@@ -153,6 +155,70 @@ export async function buildProjectionContext(
     };
   };
 
+  /**
+   * Consenso de las fuentes externas para la jornada que viene.
+   *
+   * Se pondera por el **acierto medido** de cada fuente, no por igual: una que
+   * lleva media temporada clavando los onces no vale lo mismo que otra recién
+   * añadida. Ese acierto sale de contrastar predicciones pasadas con lo que de
+   * verdad pasó (`lineup_predictions.actual_starter`), así que al principio
+   * todas pesan parecido y la diferencia aparece sola con el tiempo.
+   */
+  const consensus = new Map<string, number>();
+  if (nextMatchday !== null) {
+    try {
+      const [votes, accuracies] = await Promise.all([
+        db
+          .select({
+            source: lineupPredictions.source,
+            playerId: lineupPredictions.playerId,
+            predictedStarter: lineupPredictions.predictedStarter,
+            confidence: lineupPredictions.confidence,
+          })
+          .from(lineupPredictions)
+          .where(eq(lineupPredictions.matchday, nextMatchday)),
+        measuredAccuracies(),
+      ]);
+
+      const byPlayer = new Map<
+        string,
+        Array<{ source: string; entry: ProbableLineupEntry }>
+      >();
+      for (const vote of votes) {
+        const list = byPlayer.get(vote.playerId) ?? [];
+        list.push({
+          source: vote.source,
+          entry: {
+            playerName: "",
+            teamName: null,
+            starter: vote.predictedStarter,
+            confidence: vote.confidence,
+          },
+        });
+        byPlayer.set(vote.playerId, list);
+      }
+
+      for (const [playerId, combined] of consensusByPlayer(byPlayer, accuracies)) {
+        consensus.set(playerId, combined.probability);
+      }
+
+      if (byPlayer.size === 0) {
+        warnings.push(
+          "No hay onces probables para la próxima jornada, así que la " +
+            "titularidad sale de la racha de titularidades y no del consenso " +
+            "de las fuentes. Es peor señal, y la confianza lo refleja.",
+        );
+      }
+    } catch {
+      // Que falle el consenso no puede tumbar la proyección entera: es una
+      // señal de mejora, no un requisito.
+      warnings.push(
+        "No se han podido leer los onces probables. La proyección sigue con " +
+          "la racha de titularidades.",
+      );
+    }
+  }
+
   const league: LeagueContext = {
     pointsPer90ByPosition: computePositionAverages(seeds.map(historyOf)),
     averageGoalsFor:
@@ -183,7 +249,16 @@ export async function buildProjectionContext(
         {
           player: historyOf(seed),
           status: seed.status,
-          consensusStartProbability: null,
+          /**
+           * El consenso de las fuentes externas, cuando lo hay.
+           *
+           * Durante toda la fase 0 esto fue `null` fijo, y no por descuido de
+           * cálculo sino porque nadie llenaba `lineup_predictions`: el motor
+           * corría siempre con la racha de titularidades, que es la señal de
+           * reserva. Sigue cayendo a ella cuando no hay votos, que es lo
+           * correcto —y lo dice bajando la confianza en vez de fingirla.
+           */
+          consensusStartProbability: consensus.get(seed.playerId) ?? null,
           outlook,
         },
         league,

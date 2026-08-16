@@ -29,6 +29,20 @@ del proyecto. Las reglas del juego confirmadas y las pendientes, en
 | 3 | Subasta, modelo de precios y fichajes | hecho |
 | 4 | Alertas por Telegram | hecho |
 
+**Lo que "hecho" no quiere decir.** Los motores están escritos y probados, pero
+dos cosas siguen sin poder verificarse contra la realidad desde el entorno de
+desarrollo, y conviene no confundirlas con estar cerradas:
+
+- **Los selectores de los scrapers** no se han contrastado nunca con el HTML
+  real. La fontanería sí está conectada —la sincronización pide onces
+  probables y el consenso entra en los puntos esperados—, así que el día que
+  se confirmen los selectores empieza a funcionar sin tocar nada más. Hasta
+  entonces la interfaz avisa de que la titularidad sale de la racha, que es
+  peor señal.
+- **Siete de las nueve reglas del juego** de [`docs/reglas.md`](docs/reglas.md).
+  Ninguna está hardcodeada: o el motor que la necesita se niega a ejecutarse,
+  o la asunción se dice en pantalla.
+
 ## Los motores de la fase 1
 
 ### Caja de los rivales (`lib/engine/budget.ts`)
@@ -342,8 +356,10 @@ marcadas como tales en el código en vez de disimuladas:
   un proyecto de terceros que ataca el mismo juego, pero **sin verificar contra
   la red desde aquí**. Es seguro: un parámetro mal falla ruidosamente en el
   login, no en silencio. Detalle y procedencia en [`docs/reglas.md`](docs/reglas.md).
-- **El prefijo `/api` de la URL base**: sin confirmar. Si la sincronización da
-  404 en *todas* las rutas, se arregla con `FANTASY_API_BASE`.
+- **El prefijo `/api` de la URL base**: **confirmado** contra la API real el
+  2026-08-03 — la misma ruta da 404 sin él y 200 con él. Ya es el valor por
+  defecto. Si algún día vuelve a moverse, se arregla con `FANTASY_API_BASE` y
+  el diagnóstico de `/setup` lo detecta.
 
 Una fuente que responde 200 pero devuelve cero jugadores se trata como **caída**,
 no como "hoy no juega nadie": confundir esas dos cosas envenenaría todas las
@@ -354,7 +370,7 @@ proyecciones.
 ## Desarrollo
 
 ```bash
-npm test          # 300 tests
+npm test          # 439 tests (11 necesitan Postgres y se saltan sin él)
 npm run typecheck
 npm run build
 ```
