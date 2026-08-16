@@ -5,6 +5,7 @@ import {
   activityEvents,
   managers,
   marketListings,
+  playerLeagueSnapshots,
   playerValueSnapshots,
   players,
   rosterEntries,
@@ -153,9 +154,37 @@ export async function getMarketDashboard(
 
   /* --- Modelo de precios --------------------------------------------- */
 
+  /**
+   * El histórico de precios se arma de dos tablas y no de una.
+   *
+   * El valor, los puntos y el estado son de LaLiga y valen para cualquiera;
+   * cuánta gente tiene al jugador y si estaba en el mercado dependen de **esta**
+   * liga, porque `buildFeatures` calcula `ownedCount / leagueSize`. Estaban
+   * juntos en una tabla con clave global, y con más de una liga la última en
+   * sincronizar pisaba la propiedad de todas — el modelo habría aprendido de
+   * datos de otra liga sin que nada lo delatara.
+   *
+   * `left join`: si a un día le falta la mitad de liga, la serie sigue
+   * teniendo el precio, que es lo que de verdad predice el modelo.
+   */
   const snapshots = await db
-    .select()
+    .select({
+      playerId: playerValueSnapshots.playerId,
+      capturedOn: playerValueSnapshots.capturedOn,
+      marketValue: playerValueSnapshots.marketValue,
+      totalPoints: playerValueSnapshots.totalPoints,
+      ownedCount: playerLeagueSnapshots.ownedCount,
+      onMarket: playerLeagueSnapshots.onMarket,
+    })
     .from(playerValueSnapshots)
+    .leftJoin(
+      playerLeagueSnapshots,
+      and(
+        eq(playerLeagueSnapshots.capturedOn, playerValueSnapshots.capturedOn),
+        eq(playerLeagueSnapshots.playerId, playerValueSnapshots.playerId),
+        eq(playerLeagueSnapshots.leagueId, leagueId),
+      ),
+    )
     .orderBy(asc(playerValueSnapshots.capturedOn));
 
   const seriesByPlayer = new Map<string, PriceSeries>();

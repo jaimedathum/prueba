@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -448,6 +449,34 @@ export const manualOverrides = pgTable(
  * Por eso el cron se despliega antes que la interfaz.
  * ------------------------------------------------------------------ */
 
+/**
+ * Cuánta gente tiene a cada jugador **en una liga concreta**.
+ *
+ * Vivía dentro de `player_value_snapshots`, que tiene clave global
+ * `(fecha, jugador)`, y era una bomba de relojería para el reparto de la fase
+ * 1c: `value.ts` calcula `ownedCount / leagueSize`, o sea que es una señal por
+ * liga. Con dos ligas sincronizándose, la última en pasar habría pisado la
+ * propiedad de todas las demás, y el modelo de precios habría aprendido de
+ * datos de otro sitio sin que nada lo delatara.
+ */
+export const playerLeagueSnapshots = pgTable(
+  "player_league_snapshots",
+  {
+    capturedOn: date("captured_on").notNull(),
+    leagueId: text("league_id").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => players.id),
+    /** Cuántos managers de ESTA liga lo tienen. */
+    ownedCount: integer("owned_count"),
+    onMarket: boolean("on_market"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.capturedOn, t.leagueId, t.playerId] }),
+    index("player_league_snapshots_league_idx").on(t.leagueId, t.capturedOn),
+  ],
+);
+
 export const playerValueSnapshots = pgTable(
   "player_value_snapshots",
   {
@@ -458,10 +487,8 @@ export const playerValueSnapshots = pgTable(
     marketValue: bigint("market_value", { mode: "number" }).notNull(),
     totalPoints: integer("total_points"),
     status: text("status"),
-    /** Cuántos managers lo tienen: predictor de recorrido de precio. */
-    ownedCount: integer("owned_count"),
-    /** Si estaba en el mercado ese día (las pujas mueven el precio). */
-    onMarket: boolean("on_market"),
+    // La propiedad y la presencia en el mercado se fueron a
+    // `player_league_snapshots`: son por liga, y aquí la clave es global.
   },
   (t) => [primaryKey({ columns: [t.capturedOn, t.playerId] })],
 );
@@ -601,6 +628,52 @@ export const syncRuns = pgTable(
   (t) => [
     index("sync_runs_started_idx").on(t.startedAt),
     index("sync_runs_league_idx").on(t.leagueId, t.startedAt),
+  ],
+);
+
+/**
+ * Cola de sincronizaciones.
+ *
+ * Sustituye al disparo directo, y no es un lujo de arquitectura: es lo que
+ * permite que el trabajo caro se haga **una vez para todos**. Hay dos clases
+ * y la diferencia es toda la economía del proyecto:
+ *
+ * - `global`: catálogo de jugadores, calendario, estadísticas por jornada y
+ *   onces probables. Son idénticos para cualquiera, y son la mayor parte de
+ *   las peticiones. Se piden **una vez al día en total**.
+ * - `league`: clasificación, plantillas, mercado y feed de actividad. Solo
+ *   esto se multiplica, y se multiplica por **liga**, no por usuario: dos
+ *   personas de la misma liga comparten la misma ejecución.
+ *
+ * Con el modelo gratuito esa distinción deja de ser una optimización y pasa a
+ * ser la condición de que la factura no crezca con cada persona que entra.
+ */
+export const syncJobs = pgTable(
+  "sync_jobs",
+  {
+    id: serial("id").primaryKey(),
+    /** 'global' | 'league' */
+    kind: text("kind").notNull(),
+    /** Null en los globales: no pertenecen a ninguna liga. */
+    leagueId: text("league_id"),
+    /** Con qué credencial se ejecuta. Null = la que haya disponible. */
+    accountId: text("account_id"),
+    /** 'pending' | 'running' | 'done' | 'failed' */
+    state: text("state").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    error: text("error"),
+  },
+  (t) => [
+    index("sync_jobs_pending_idx").on(t.state, t.scheduledAt),
+    /** Un trabajo pendiente por liga: encolar dos veces no duplica trabajo. */
+    uniqueIndex("sync_jobs_unique_pending_idx")
+      .on(t.kind, t.leagueId)
+      .where(sql`${t.state} = 'pending'`),
   ],
 );
 
