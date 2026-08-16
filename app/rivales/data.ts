@@ -1,4 +1,4 @@
-import { resolveTenant } from "@/lib/tenant";
+import { currentTenant } from "@/lib/auth";
 import { cache } from "react";
 import { getRivalsDashboard, type RivalView } from "@/lib/engine/rivals-load";
 
@@ -21,7 +21,7 @@ import { getRivalsDashboard, type RivalView } from "@/lib/engine/rivals-load";
  * viene a evitar.
  */
 export const getLeague = cache(async () =>
-  getRivalsDashboard(await resolveTenant()),
+  getRivalsDashboard(await currentTenant()),
 );
 
 export interface RivalContext {
