@@ -33,6 +33,7 @@ import {
   parseRosterEntry,
   type ParsedRealTeam,
 } from "./parse";
+import { ingestProbableLineups } from "./lineups";
 import { RawRecorder } from "./raw";
 
 /**
@@ -742,6 +743,33 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
               },
             });
         }
+      }
+    }
+
+    /* --- 6b. Onces probables de las fuentes externas ---------------- */
+    /**
+     * Va después del calendario porque necesita saber qué jornada viene, y
+     * antes de los snapshots porque no depende de ellos.
+     *
+     * Es la mitad que faltaba de `lib/sources/**`: hasta ahora los adaptadores
+     * y el consenso existían con sus tests pero no los llamaba nadie, así que
+     * los puntos esperados corrían siempre con la señal de reserva. Ningún
+     * fallo de aquí puede tumbar la sincronización — es una mejora de la
+     * proyección, no un requisito.
+     */
+    if (lastWeek !== null) {
+      try {
+        const lineups = await ingestProbableLineups(lastWeek + 1, { persist });
+        stats.lineupPredictions = lineups.written;
+        warnings.push(...lineups.warnings);
+        if (lineups.written > 0) {
+          log(`Onces probables: ${lineups.written} predicciones`);
+        }
+      } catch (error) {
+        warnings.push(
+          "No se han podido leer los onces probables: " +
+            (error instanceof Error ? error.message : String(error)),
+        );
       }
     }
 
