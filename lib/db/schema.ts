@@ -276,6 +276,16 @@ export const managers = pgTable(
     leagueId: text("league_id").notNull(),
     teamName: text("team_name").notNull(),
     managerName: text("manager_name"),
+    /**
+     * Id de usuario, que NO es el mismo que el de equipo.
+     *
+     * El feed de actividad identifica a los managers por usuario y la
+     * clasificación por equipo. Sin guardar los dos no hay forma de cruzarlos,
+     * y sin cruzarlos ningún movimiento se atribuye a nadie: todas las cajas
+     * se quedan en el presupuesto inicial y la calibración las deja a todas
+     * con el saldo del dueño del despliegue.
+     */
+    userId: text("user_id"),
     // `is_me` vivía aquí y era el punto más incompatible con multi-tenancy de
     // todo el proyecto: un booleano global, escrito con un UPDATE sin WHERE.
     // Ahora la identidad es de la cuenta, en `account_leagues.my_team_id`.
@@ -288,7 +298,10 @@ export const managers = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("managers_league_idx").on(t.leagueId)],
+  (t) => [
+    index("managers_league_idx").on(t.leagueId),
+    index("managers_user_idx").on(t.userId),
+  ],
 );
 
 /** Quién posee a quién, ahora mismo. Un jugador tiene como mucho un dueño. */

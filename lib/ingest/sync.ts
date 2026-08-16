@@ -33,6 +33,7 @@ import {
   parseRosterEntry,
   type ParsedPlayer,
 } from "./parse";
+import { buildManagerIndex, resolveManagerRef } from "./manager-index";
 import { RawRecorder } from "./raw";
 import { syncGlobal } from "./sync-global";
 import { asArray, chunk, today } from "./util";
@@ -520,7 +521,9 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     /* --- 6. Feed de actividad -------------------------------------- */
     const maxPages = options.maxActivityPages ?? 200;
     const events = [];
-    const managerIds = new Set(parsedManagers.map((m) => m.id));
+    const managerIndex = buildManagerIndex(parsedManagers);
+    /** Referencias del feed que no corresponden a ningún manager conocido. */
+    const unresolvedRefs = new Set<string>();
     const playerIds = new Set(parsedPlayers.map((p) => p.id));
 
     for (let page = 0; page < maxPages; page++) {
@@ -532,18 +535,29 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
         const { event, mapper } = parseActivityEvent(raw, leagueId);
         shape?.add("activityEvent", mapper);
         if (!event) continue;
+
+        // El feed identifica a los managers con el id de USUARIO y la
+        // clasificación con el de EQUIPO. El índice traduce cualquiera de los
+        // dos; si no reconoce ninguno, se anota para poder avisar.
+        const resolvedManager = resolveManagerRef(managerIndex, event.managerId);
+        const resolvedCounterparty = resolveManagerRef(
+          managerIndex,
+          event.counterpartyManagerId,
+        );
+
+        if (event.managerId && !resolvedManager) {
+          unresolvedRefs.add(event.managerId);
+        }
+        if (event.counterpartyManagerId && !resolvedCounterparty) {
+          unresolvedRefs.add(event.counterpartyManagerId);
+        }
+
         events.push({
           ...event,
           // Las claves foráneas solo se rellenan si la entidad existe:
           // un id desconocido no debe tumbar la ingesta entera.
-          managerId: managerIds.has(event.managerId ?? "")
-            ? event.managerId
-            : null,
-          counterpartyManagerId: managerIds.has(
-            event.counterpartyManagerId ?? "",
-          )
-            ? event.counterpartyManagerId
-            : null,
+          managerId: resolvedManager,
+          counterpartyManagerId: resolvedCounterparty,
           playerId: playerIds.has(event.playerId ?? "") ? event.playerId : null,
           raw: raw as object,
         });
@@ -551,6 +565,36 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     }
     stats.activityEvents = events.length;
     stats.activityUnknown = events.filter((e) => e.type === "unknown").length;
+
+    /**
+     * El aviso que faltaba.
+     *
+     * Un feed lleno de movimientos que no se atribuyen a nadie produce
+     * exactamente la misma pantalla que un feed vacío —todos los rivales con
+     * la misma caja, y encima la tuya, porque la calibración desplaza a todos
+     * por igual— pero sin ningún aviso que lo explicara. Ahora se cuenta, y
+     * se enseñan ejemplos: son la pista de qué espacio de identificadores usa
+     * el feed en realidad.
+     */
+    const attributed = events.filter((e) => e.managerId !== null).length;
+    stats.activityAttributed = attributed;
+
+    if (events.length > 0 && attributed === 0) {
+      warnings.push(
+        `Ninguno de los ${events.length} movimientos del feed se ha podido ` +
+          "atribuir a un manager, así que las cajas de todos se quedan en el " +
+          "presupuesto inicial y salen iguales. El feed identifica a los " +
+          "managers con ids que no coinciden con los de la clasificación; " +
+          `ejemplos sin reconocer: ${[...unresolvedRefs].slice(0, 5).join(", ")}. ` +
+          "Ejecuta `npm run sync -- --dry-run --shape` para ver qué campo los trae.",
+      );
+    } else if (unresolvedRefs.size > 0) {
+      warnings.push(
+        `${unresolvedRefs.size} identificadores del feed no corresponden a ` +
+          "ningún manager de la liga. Sus movimientos no cuentan para la caja " +
+          `de nadie (ejemplos: ${[...unresolvedRefs].slice(0, 3).join(", ")}).`,
+      );
+    }
     log(
       `Feed de actividad: ${events.length} eventos (${stats.activityUnknown} sin clasificar)`,
     );

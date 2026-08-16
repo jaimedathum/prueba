@@ -222,6 +222,25 @@ export async function getRivalsDashboard(
         "inicial supuesto, iguales para todos. Hasta que haya movimientos, " +
         "esta pantalla dice poco de quién puede pagar qué.",
     );
+  } else if (events.every((event) => event.managerId === null)) {
+    /**
+     * Hay movimientos, pero ninguno tiene dueño.
+     *
+     * Da la misma pantalla que el feed vacío —todos con idéntica caja, y
+     * además la tuya, porque la calibración desplaza a todos por igual para
+     * cuadrar tu saldo— pero por un motivo completamente distinto y que sí
+     * tiene arreglo. Sin este aviso, el error era mudo: las cifras salían con
+     * toda su precisión aparente y no había nada que delatara que estaban
+     * calculadas sobre cero información.
+     */
+    warnings.push(
+      `Hay ${events.length} movimientos en el feed pero ninguno se ha podido ` +
+        "atribuir a un manager, así que las cajas de abajo NO son estimaciones: " +
+        "son el presupuesto inicial para todos, ajustado a tu saldo. No te fíes " +
+        "de ellas. Vuelve a sincronizar desde /setup —la ingesta ahora cruza los " +
+        "dos identificadores del juego— y si el aviso persiste, `npm run sync -- " +
+        "--dry-run --shape` dice qué campo identifica a los managers en el feed.",
+    );
   }
 
   /* --- Plantillas de todos ----------------------------------------- */

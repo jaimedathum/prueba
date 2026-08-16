@@ -119,6 +119,11 @@ export function parsePlayer(raw: unknown): {
 
 export interface ParsedManager {
   id: string;
+  /**
+   * Id de usuario, distinto del de equipo. El feed de actividad identifica a
+   * los managers con este, así que sin él sus movimientos se quedan sin dueño.
+   */
+  userId: string | null;
   leagueId: string;
   teamName: string;
   managerName: string | null;
@@ -143,6 +148,21 @@ export function parseManager(
   // nombre que se probaban.
   if (!id) return { manager: null, mapper: m };
 
+  /**
+   * El otro identificador del manager.
+   *
+   * El feed de actividad trae `user1Id`, que NO es el id de equipo con el que
+   * se guarda aquí. Sin traducción entre los dos, cada movimiento se queda sin
+   * dueño y todas las cajas se quedan clavadas en el presupuesto inicial.
+   */
+  const userId = m.string(
+    "userId",
+    "user.id",
+    "manager.id",
+    "managerId",
+    "team.user.id",
+  );
+
   const managerName = m.string(
     "manager.managerName",
     "managerName",
@@ -164,6 +184,7 @@ export function parseManager(
   return {
     manager: {
       id,
+      userId,
       leagueId,
       teamName,
       managerName,
