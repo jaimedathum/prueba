@@ -1,3 +1,4 @@
+import { resolveTenant } from "@/lib/tenant";
 import { getLineupDashboard } from "@/lib/engine/lineup-load";
 import { positionCode } from "@/lib/domain/positions";
 import { SetupNotice } from "../setup-notice";
@@ -28,7 +29,7 @@ export const dynamic = "force-dynamic";
 export default async function AlineacionPage() {
   let data;
   try {
-    data = await getLineupDashboard();
+    data = await getLineupDashboard(await resolveTenant());
   } catch (error) {
     return (
       <SetupNotice

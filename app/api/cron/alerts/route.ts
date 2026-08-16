@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runAlerts } from "@/lib/alerts/run";
+import { activeLeagues } from "@/lib/tenant";
 import { safeEqual } from "@/lib/fantasy/crypto";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,35 @@ export async function GET(request: Request): Promise<NextResponse> {
   const dryRun = new URL(request.url).searchParams.get("dry-run") === "1";
 
   try {
-    const result = await runAlerts({ dryRun });
-    return NextResponse.json({ ok: true, ...result });
+    const leagues = await activeLeagues();
+    if (leagues.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        leagues: 0,
+        reason: "No hay ninguna liga configurada todavía.",
+      });
+    }
+
+    /**
+     * Una tanda por liga, y el fallo de una no calla a las demás: con varios
+     * clientes, que la base de datos de uno falle no puede dejar sin aviso al
+     * resto. Por eso se recoge el error de cada una en vez de dejar que
+     * tumbe el job entero.
+     */
+    const results = await Promise.all(
+      leagues.map(async (ctx) => {
+        try {
+          return { leagueId: ctx.leagueId, ...(await runAlerts(ctx, { dryRun })) };
+        } catch (error) {
+          return {
+            leagueId: ctx.leagueId,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }),
+    );
+
+    return NextResponse.json({ ok: true, leagues: leagues.length, results });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

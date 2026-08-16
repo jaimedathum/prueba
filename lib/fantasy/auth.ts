@@ -304,8 +304,6 @@ export async function refreshAccessToken(
  * Persistencia del refresh token
  * ------------------------------------------------------------------ */
 
-const SINGLETON_ID = "default";
-
 /** Lo guardado: el token y la política que lo emitió, que hace falta para
  *  refrescarlo. */
 export interface StoredToken {
@@ -318,61 +316,91 @@ export interface TokenStore {
   write(token: StoredToken): Promise<void>;
 }
 
-/** Store real: refresh token cifrado en Postgres. */
-export const dbTokenStore: TokenStore = {
-  async read() {
-    const db = getDb();
-    const [row] = await db
-      .select()
-      .from(authTokens)
-      .where(eq(authTokens.id, SINGLETON_ID))
-      .limit(1);
-    if (!row) return null;
-    return {
-      refreshToken: decryptToken({
-        ciphertext: row.encryptedRefreshToken,
-        iv: row.iv,
-        authTag: row.authTag,
-      }),
-      policy: row.policy,
-    };
-  },
+/**
+ * Store real: un refresh token cifrado por cuenta.
+ *
+ * Antes esto era un singleton literal —una constante `SINGLETON_ID =
+ * "default"`— y era el techo duro del proyecto: no había forma de guardar una
+ * segunda credencial en la misma base de datos, ni API para pedirla.
+ */
+export function dbTokenStore(accountId: string): TokenStore {
+  return {
+    async read() {
+      const db = getDb();
+      const [row] = await db
+        .select()
+        .from(authTokens)
+        .where(eq(authTokens.accountId, accountId))
+        .limit(1);
+      if (!row) return null;
+      return {
+        refreshToken: decryptToken({
+          ciphertext: row.encryptedRefreshToken,
+          iv: row.iv,
+          authTag: row.authTag,
+        }),
+        policy: row.policy,
+      };
+    },
 
-  async write({ refreshToken, policy }: StoredToken) {
-    const db = getDb();
-    const encrypted = encryptToken(refreshToken);
-    await db
-      .insert(authTokens)
-      .values({
-        id: SINGLETON_ID,
-        encryptedRefreshToken: encrypted.ciphertext,
-        iv: encrypted.iv,
-        authTag: encrypted.authTag,
-        policy,
-      })
-      .onConflictDoUpdate({
-        target: authTokens.id,
-        set: {
+    async write({ refreshToken, policy }: StoredToken) {
+      const db = getDb();
+      const encrypted = encryptToken(refreshToken);
+      await db
+        .insert(authTokens)
+        .values({
+          accountId,
           encryptedRefreshToken: encrypted.ciphertext,
           iv: encrypted.iv,
           authTag: encrypted.authTag,
           policy,
-          updatedAt: new Date(),
-        },
-      });
-  },
-};
+        })
+        .onConflictDoUpdate({
+          target: authTokens.accountId,
+          set: {
+            encryptedRefreshToken: encrypted.ciphertext,
+            iv: encrypted.iv,
+            authTag: encrypted.authTag,
+            policy,
+            updatedAt: new Date(),
+          },
+        });
+    },
+  };
+}
+
+/**
+ * Borra la credencial de una cuenta.
+ *
+ * Hace falta para dar de baja de verdad: al cancelar hay que dejar de poder
+ * entrar en el juego en nombre de alguien, no solo marcar una suscripción
+ * como inactiva.
+ */
+export async function deleteStoredToken(accountId: string): Promise<void> {
+  const db = getDb();
+  await db.delete(authTokens).where(eq(authTokens.accountId, accountId));
+}
 
 /**
  * Sesión: mantiene un access token vivo, refrescándolo cuando caduca y
  * rotando el refresh token guardado.
+ *
+ * Una instancia por cuenta. La coalescencia de refrescos concurrentes vive en
+ * la instancia, así que dos cuentas no comparten ni token ni refresco en
+ * vuelo — que es exactamente lo que hay que evitar.
  */
 export class FantasySession {
   private bearerToken: string | null = null;
   private expiresAt = 0;
   private inFlight: Promise<string> | null = null;
+  private readonly store: TokenStore;
 
-  constructor(private readonly store: TokenStore = dbTokenStore) {}
+  constructor(accountIdOrStore: string | TokenStore) {
+    this.store =
+      typeof accountIdOrStore === "string"
+        ? dbTokenStore(accountIdOrStore)
+        : accountIdOrStore;
+  }
 
   /**
    * Token para `Authorization: Bearer`. Se llama así, y no `getAccessToken`,

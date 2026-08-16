@@ -1,3 +1,4 @@
+import { DEFAULT_ACCOUNT_ID } from "@/lib/tenant";
 import { FantasySession } from "./auth";
 import { API_BASE, COMPETITION_ID, endpoints, isAllowedPath } from "./endpoints";
 
@@ -124,7 +125,7 @@ export async function diagnoseApi(options: {
   fetchImpl?: typeof fetch;
   base?: string;
 } = {}): Promise<ApiDiagnosis> {
-  const session = options.session ?? new FantasySession();
+  const session = options.session ?? new FantasySession(DEFAULT_ACCOUNT_ID);
   const fetchImpl = options.fetchImpl ?? fetch;
   const configuredBase = (options.base ?? API_BASE).replace(/\/$/, "");
   const token = await session.getBearerToken();

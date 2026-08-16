@@ -1,5 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import type { TenantContext } from "@/lib/tenant";
 import { managers, players, rosterEntries } from "@/lib/db/schema";
 import { FALLBACK_FORMATIONS, type PositionCode } from "@/lib/domain/positions";
 import type { LeagueContext } from "./expected-points";
@@ -36,13 +37,17 @@ const FORMATIONS: Formation[] = FALLBACK_FORMATIONS.map((slots) => ({
   slots: slots as Record<PositionCode, number>,
 }));
 
-export async function getLineupDashboard(): Promise<LineupDashboard | null> {
+export async function getLineupDashboard(
+  ctx: TenantContext,
+): Promise<LineupDashboard | null> {
   const db = getDb();
 
   const [me] = await db
     .select()
     .from(managers)
-    .where(eq(managers.isMe, true))
+    .where(
+      and(eq(managers.id, ctx.myTeamId), eq(managers.leagueId, ctx.leagueId)),
+    )
     .limit(1);
   if (!me) return null;
 
@@ -57,7 +62,14 @@ export async function getLineupDashboard(): Promise<LineupDashboard | null> {
     })
     .from(rosterEntries)
     .innerJoin(players, eq(players.id, rosterEntries.playerId))
-    .where(eq(rosterEntries.managerId, me.id));
+    // El filtro por liga faltaba: un manager solo está en una, pero apoyarse
+    // en eso es apoyarse en una coincidencia, no en una garantía.
+    .where(
+      and(
+        eq(rosterEntries.leagueId, ctx.leagueId),
+        eq(rosterEntries.managerId, me.id),
+      ),
+    );
 
   const context = await buildProjectionContext(squad);
   const warnings = [...context.warnings];

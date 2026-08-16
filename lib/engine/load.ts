@@ -1,5 +1,6 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import type { TenantContext } from "@/lib/tenant";
 import {
   activityEvents,
   managers,
@@ -108,6 +109,7 @@ async function buildValueLookup(
 }
 
 export async function getRiskDashboard(
+  ctx: TenantContext,
   horizonDays = 14,
 ): Promise<RiskDashboard | null> {
   const db = getDb();
@@ -115,11 +117,13 @@ export async function getRiskDashboard(
   const [me] = await db
     .select()
     .from(managers)
-    .where(eq(managers.isMe, true))
+    .where(
+      and(eq(managers.id, ctx.myTeamId), eq(managers.leagueId, ctx.leagueId)),
+    )
     .limit(1);
   if (!me) return null;
 
-  const leagueId = me.leagueId;
+  const leagueId = ctx.leagueId;
 
   const allManagers = await db
     .select()
@@ -182,7 +186,7 @@ export async function getRiskDashboard(
     .innerJoin(players, eq(players.id, rosterEntries.playerId))
     .where(eq(rosterEntries.leagueId, leagueId));
 
-  const overrides = await loadOverrides("player");
+  const overrides = await loadOverrides(ctx.accountId, "player");
   const roster = applyOverrides(rosterRows, (row) => row.playerId, overrides);
 
   /**

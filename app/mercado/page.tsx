@@ -1,3 +1,4 @@
+import { resolveTenant } from "@/lib/tenant";
 import { getMarketDashboard } from "@/lib/engine/market-load";
 import { bidForProbability } from "@/lib/engine/auction";
 import { formatMoney } from "@/lib/queries";
@@ -30,7 +31,7 @@ export const dynamic = "force-dynamic";
 export default async function MercadoPage() {
   let data;
   try {
-    data = await getMarketDashboard();
+    data = await getMarketDashboard(await resolveTenant());
   } catch (error) {
     return (
       <SetupNotice

@@ -8,6 +8,7 @@
  *   npm run sync -- --offline    ni red ni base de datos: solo valida rutas
  *   npm run sync -- --login      inicia sesión y guarda el refresh token
  */
+import { DEFAULT_ACCOUNT_ID } from "@/lib/tenant";
 import { closeDb } from "@/lib/db";
 import {
   FantasySession,
@@ -46,7 +47,7 @@ async function doLogin(): Promise<void> {
   }
   try {
     const tokens = await loginWithPassword(email, password);
-    await new FantasySession().adopt(tokens);
+    await new FantasySession(DEFAULT_ACCOUNT_ID).adopt(tokens);
   } catch (error) {
     // El fallo más probable no es la contraseña: es que la cuenta sea social.
     // ROPC solo habla con cuentas locales de B2C, así que conviene decirlo

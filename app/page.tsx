@@ -1,3 +1,4 @@
+import { resolveTenant } from "@/lib/tenant";
 import { getDashboardData, formatMoney } from "@/lib/queries";
 import { SetupNotice } from "./setup-notice";
 import {
@@ -31,7 +32,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   let data;
   try {
-    data = await getDashboardData();
+    data = await getDashboardData(await resolveTenant());
   } catch (error) {
     return (
       <SetupNotice
