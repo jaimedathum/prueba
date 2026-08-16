@@ -9,7 +9,7 @@ import {
   marketListings,
   matches,
   playerMatchStats,
-  playerValueSnapshots,
+  playerLeagueSnapshots,
   players,
   realTeams,
   rosterEntries,
@@ -31,10 +31,11 @@ import {
   parseRealTeam,
   parseTeamBalance,
   parseRosterEntry,
-  type ParsedRealTeam,
+  type ParsedPlayer,
 } from "./parse";
-import { ingestProbableLineups } from "./lineups";
 import { RawRecorder } from "./raw";
+import { syncGlobal } from "./sync-global";
+import { asArray, chunk, today } from "./util";
 
 /**
  * Sincronización diaria.
@@ -56,6 +57,15 @@ export interface SyncOptions {
   collectShape?: boolean;
   maxActivityPages?: number;
   log?: (message: string) => void;
+  /**
+   * Saltarse la mitad global.
+   *
+   * Es lo que permite que el trabajo caro se pague una vez: quien sincroniza
+   * varias ligas seguidas ejecuta `syncGlobal()` al principio y luego cada
+   * liga con esto activado. Sin ello, el catálogo y las 38 jornadas de
+   * calendario se pedirían una vez por liga.
+   */
+  skipGlobal?: boolean;
 }
 
 export interface SyncResult {
@@ -63,16 +73,6 @@ export interface SyncResult {
   stats: Record<string, number>;
   warnings: string[];
   shape: ShapeCollector | null;
-}
-
-const today = () => new Date().toISOString().slice(0, 10);
-
-function chunk<T>(items: T[], size = 500): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(items.slice(i, i + size));
-  }
-  return out;
 }
 
 /**
@@ -141,18 +141,6 @@ export function extractMyTeamId(
   }
 
   return null;
-}
-
-/** La API devuelve a veces `{data: [...]}` y a veces el array pelado. */
-function asArray(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === "object") {
-    for (const key of ["data", "items", "elements", "results"]) {
-      const value = (payload as Record<string, unknown>)[key];
-      if (Array.isArray(value)) return value;
-    }
-  }
-  return [];
 }
 
 export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
@@ -248,85 +236,23 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
         .where(eq(syncRuns.id, runId));
     }
 
-    /* --- 2. Jugadores ---------------------------------------------- */
-    const playersPayload = await client.get(endpoints.players());
-    const parsedPlayers = [];
-    const teamsSeen = new Map<string, ParsedRealTeam>();
-
-    for (const raw of asArray(playersPayload)) {
-      const { player, mapper } = parsePlayer(raw);
-      shape?.add("player", mapper);
-      if (!player) continue;
-      parsedPlayers.push(player);
-
-      // Mismo parser, mismos alias: así el equipo al que apunta el jugador es
-      // exactamente el que se guarda.
-      const team = parseRealTeam(raw);
-      if (team) teamsSeen.set(team.id, team);
-    }
-    stats.players = parsedPlayers.length;
-    log(`Jugadores: ${parsedPlayers.length}`);
-
-    if (db) {
-      for (const batch of chunk([...teamsSeen.values()])) {
-        await db
-          .insert(realTeams)
-          .values(batch)
-          .onConflictDoUpdate({
-            target: realTeams.id,
-            set: {
-              name: sql`excluded.name`,
-              shortName: sql`excluded.short_name`,
-              badgeUrl: sql`excluded.badge_url`,
-            },
-          });
-      }
-
-      // Un jugador no puede apuntar a un equipo que no existe: la clave ajena
-      // aborta el INSERT entero y con él la sincronización. Igual que en el
-      // feed de actividad, un id desconocido vacía el vínculo pero no tumba la
-      // ingesta. Se comprueba contra la tabla, no contra lo visto en esta
-      // pasada, porque puede haber equipos de sincronizaciones anteriores.
-      const knownTeamIds = new Set(
-        (await db.select({ id: realTeams.id }).from(realTeams)).map((t) => t.id),
-      );
-
-      let orphaned = 0;
-      for (const player of parsedPlayers) {
-        if (player.realTeamId !== null && !knownTeamIds.has(player.realTeamId)) {
-          player.realTeamId = null;
-          orphaned++;
-        }
-      }
-      if (orphaned > 0) {
-        stats.playersWithoutTeam = orphaned;
-        warnings.push(
-          `${orphaned} jugadores apuntan a un equipo que no se ha podido ` +
-            "identificar; se guardan sin equipo. El modelo de equipos y el " +
-            "ajuste por rival serán menos precisos para ellos. Revisa los " +
-            "alias de TEAM_ID_ALIASES en lib/ingest/parse.ts con --shape.",
-        );
-      }
-
-      for (const batch of chunk(parsedPlayers)) {
-        await db
-          .insert(players)
-          .values(batch)
-          .onConflictDoUpdate({
-            target: players.id,
-            set: {
-              name: sql`excluded.name`,
-              nickname: sql`excluded.nickname`,
-              positionId: sql`excluded.position_id`,
-              realTeamId: sql`excluded.real_team_id`,
-              status: sql`excluded.status`,
-              marketValue: sql`excluded.market_value`,
-              totalPoints: sql`excluded.total_points`,
-              averagePoints: sql`excluded.average_points`,
-              updatedAt: new Date(),
-            },
-          });
-      }
+    /* --- 2. Lo que es igual para todo el mundo --------------------- */
+    /**
+     * Catálogo, calendario, estadísticas y onces probables salen de aquí, y
+     * son la mayor parte de las peticiones. Al estar fuera de la mitad por
+     * liga, se pagan **una vez** por mucha gente que entre.
+     */
+    let parsedPlayers: ParsedPlayer[];
+    if (options.skipGlobal) {
+      // Ya lo hizo otro en esta tanda: basta con el catálogo que hay guardado.
+      parsedPlayers = db
+        ? ((await db.select().from(players)) as ParsedPlayer[])
+        : [];
+    } else {
+      const global = await syncGlobal({ client, persist, log, shape });
+      parsedPlayers = global.players;
+      Object.assign(stats, global.stats);
+      warnings.push(...global.warnings);
     }
 
     /* --- 3. Managers de la liga ------------------------------------ */
@@ -657,122 +583,6 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       }
     }
 
-    /* --- 6b. Calendario y estadísticas por jornada ------------------ */
-    // Sin resultados reales no hay modelo de equipos, y sin él los puntos
-    // esperados pierden el ajuste por rival y la portería a cero.
-    const weekPayload = await client.get(endpoints.currentWeek());
-    const currentWeek =
-      (weekPayload as Record<string, unknown> | null)?.["weekNumber"] ??
-      (weekPayload as Record<string, unknown> | null)?.["week"] ??
-      null;
-    const lastWeek =
-      typeof currentWeek === "number"
-        ? currentWeek
-        : Number(currentWeek) || null;
-
-    if (lastWeek === null) {
-      warnings.push(
-        "No se ha podido determinar la jornada actual: no se sincronizan " +
-          "resultados ni estadísticas, y el modelo de equipos se queda sin datos.",
-      );
-    } else {
-      const parsedMatches = [];
-      for (let week = 1; week <= lastWeek; week++) {
-        const payload = await client.get(endpoints.calendar(), {
-          weekNumber: week,
-        });
-        for (const raw of asArray(payload)) {
-          const { match, mapper } = parseMatch(raw, week);
-          shape?.add("match", mapper);
-          if (match) parsedMatches.push(match);
-        }
-      }
-      stats.matches = parsedMatches.length;
-      stats.matchesFinished = parsedMatches.filter((m) => m.finished).length;
-      log(
-        `Partidos: ${parsedMatches.length} (${stats.matchesFinished} con resultado)`,
-      );
-
-      if (db && parsedMatches.length > 0) {
-        for (const batch of chunk(parsedMatches)) {
-          await db
-            .insert(matches)
-            .values(batch)
-            .onConflictDoUpdate({
-              target: matches.id,
-              set: {
-                homeGoals: sql`excluded.home_goals`,
-                awayGoals: sql`excluded.away_goals`,
-                kickoffAt: sql`excluded.kickoff_at`,
-                finished: sql`excluded.finished`,
-              },
-            });
-        }
-      }
-
-      // Estadísticas solo de jornadas ya jugadas: las futuras no tienen nada.
-      const playedWeeks = [
-        ...new Set(parsedMatches.filter((m) => m.finished).map((m) => m.matchday)),
-      ].sort((a, b) => a - b);
-
-      const statRows = [];
-      for (const week of playedWeeks) {
-        const payload = await client.get(endpoints.weekStats(week));
-        for (const raw of asArray(payload)) {
-          const { stat, mapper } = parsePlayerMatchStat(raw);
-          shape?.add("playerMatchStat", mapper);
-          if (stat && playerIds.has(stat.playerId)) {
-            statRows.push({ ...stat, matchday: week });
-          }
-        }
-      }
-      stats.playerMatchStats = statRows.length;
-      log(`Estadísticas por jornada: ${statRows.length} registros`);
-
-      if (db && statRows.length > 0) {
-        for (const batch of chunk(statRows)) {
-          await db
-            .insert(playerMatchStats)
-            .values(batch)
-            .onConflictDoUpdate({
-              target: [playerMatchStats.playerId, playerMatchStats.matchday],
-              set: {
-                minutes: sql`excluded.minutes`,
-                points: sql`excluded.points`,
-                started: sql`excluded.started`,
-              },
-            });
-        }
-      }
-    }
-
-    /* --- 6b. Onces probables de las fuentes externas ---------------- */
-    /**
-     * Va después del calendario porque necesita saber qué jornada viene, y
-     * antes de los snapshots porque no depende de ellos.
-     *
-     * Es la mitad que faltaba de `lib/sources/**`: hasta ahora los adaptadores
-     * y el consenso existían con sus tests pero no los llamaba nadie, así que
-     * los puntos esperados corrían siempre con la señal de reserva. Ningún
-     * fallo de aquí puede tumbar la sincronización — es una mejora de la
-     * proyección, no un requisito.
-     */
-    if (lastWeek !== null) {
-      try {
-        const lineups = await ingestProbableLineups(lastWeek + 1, { persist });
-        stats.lineupPredictions = lineups.written;
-        warnings.push(...lineups.warnings);
-        if (lineups.written > 0) {
-          log(`Onces probables: ${lineups.written} predicciones`);
-        }
-      } catch (error) {
-        warnings.push(
-          "No se han podido leer los onces probables: " +
-            (error instanceof Error ? error.message : String(error)),
-        );
-      }
-    }
-
     /* --- 7. Snapshots del día -------------------------------------- */
     if (db) {
       const capturedOn = today();
@@ -782,37 +592,40 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       }
       const onMarket = new Set(listings.map((l) => l.playerId));
 
-      const valueRows = parsedPlayers
+      /**
+       * La propiedad y la presencia en el mercado son **por liga**: `value.ts`
+       * calcula `ownedCount / leagueSize`. Vivían en `player_value_snapshots`,
+       * que tiene clave global, así que con dos ligas la última en sincronizar
+       * habría pisado la de todas — y el modelo de precios habría aprendido de
+       * datos de otro sitio sin que nada lo delatara.
+       */
+      const leagueRows = parsedPlayers
         .filter((p) => p.marketValue !== null)
         .map((p) => ({
           capturedOn,
+          leagueId,
           playerId: p.id,
-          marketValue: p.marketValue as number,
-          totalPoints: p.totalPoints,
-          status: p.status,
           ownedCount: ownership.get(p.id) ?? 0,
           onMarket: onMarket.has(p.id),
         }));
 
-      for (const batch of chunk(valueRows)) {
+      for (const batch of chunk(leagueRows)) {
         await db
-          .insert(playerValueSnapshots)
+          .insert(playerLeagueSnapshots)
           .values(batch)
           .onConflictDoUpdate({
             target: [
-              playerValueSnapshots.capturedOn,
-              playerValueSnapshots.playerId,
+              playerLeagueSnapshots.capturedOn,
+              playerLeagueSnapshots.leagueId,
+              playerLeagueSnapshots.playerId,
             ],
             set: {
-              marketValue: sql`excluded.market_value`,
-              totalPoints: sql`excluded.total_points`,
-              status: sql`excluded.status`,
               ownedCount: sql`excluded.owned_count`,
               onMarket: sql`excluded.on_market`,
             },
           });
       }
-      stats.valueSnapshots = valueRows.length;
+      stats.leagueSnapshots = leagueRows.length;
 
       const valueByPlayer = new Map(
         parsedPlayers.map((p) => [p.id, p.marketValue]),
