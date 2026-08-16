@@ -1,5 +1,6 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import type { TenantContext } from "@/lib/tenant";
 import {
   activityEvents,
   managers,
@@ -93,6 +94,7 @@ export interface MarketDashboard {
 }
 
 export async function getMarketDashboard(
+  ctx: TenantContext,
   now = new Date(),
 ): Promise<MarketDashboard | null> {
   const db = getDb();
@@ -101,11 +103,13 @@ export async function getMarketDashboard(
   const [me] = await db
     .select()
     .from(managers)
-    .where(eq(managers.isMe, true))
+    .where(
+      and(eq(managers.id, ctx.myTeamId), eq(managers.leagueId, ctx.leagueId)),
+    )
     .limit(1);
   if (!me) return null;
 
-  const leagueId = me.leagueId;
+  const leagueId = ctx.leagueId;
   const allManagers = await db
     .select()
     .from(managers)

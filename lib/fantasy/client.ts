@@ -1,5 +1,6 @@
 import { API_BASE, isAllowedPath } from "./endpoints";
 import { FantasySession } from "./auth";
+import { DEFAULT_ACCOUNT_ID } from "@/lib/tenant";
 
 /**
  * Cliente HTTP de la API del juego.
@@ -41,6 +42,11 @@ export interface RawRecord {
 
 export interface FantasyClientOptions {
   session?: FantasySession;
+  /**
+   * De quién es la credencial. Se ignora si se pasa `session` hecha.
+   * Por defecto, la cuenta del despliegue de un solo dueño.
+   */
+  accountId?: string;
   fetchImpl?: typeof fetch;
   /** Pausa mínima entre peticiones. Rate limiting suave y deliberado. */
   minIntervalMs?: number;
@@ -77,7 +83,9 @@ export class FantasyClient {
   readonly plannedRequests: string[] = [];
 
   constructor(options: FantasyClientOptions = {}) {
-    this.session = options.session ?? new FantasySession();
+    this.session =
+      options.session ??
+      new FantasySession(options.accountId ?? DEFAULT_ACCOUNT_ID);
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.minIntervalMs = options.minIntervalMs ?? 350;
     this.maxRetries = options.maxRetries ?? 4;

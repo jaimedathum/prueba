@@ -1,3 +1,4 @@
+import { resolveTenant } from "@/lib/tenant";
 import { getRiskDashboard } from "@/lib/engine/load";
 import { formatMoney } from "@/lib/queries";
 import { SetupNotice } from "../setup-notice";
@@ -28,7 +29,7 @@ export const dynamic = "force-dynamic";
 export default async function RiesgoPage() {
   let data;
   try {
-    data = await getRiskDashboard();
+    data = await getRiskDashboard(await resolveTenant());
   } catch (error) {
     return (
       <SetupNotice

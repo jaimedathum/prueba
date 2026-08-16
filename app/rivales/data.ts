@@ -1,3 +1,4 @@
+import { resolveTenant } from "@/lib/tenant";
 import { cache } from "react";
 import { getRivalsDashboard, type RivalView } from "@/lib/engine/rivals-load";
 
@@ -13,7 +14,15 @@ import { getRivalsDashboard, type RivalView } from "@/lib/engine/rivals-load";
  * evita que eso se pague dos veces en la misma petición, que es lo que
  * pasaría con la página y sus metadatos.
  */
-export const getLeague = cache(getRivalsDashboard);
+/**
+ * El contexto se resuelve **dentro** del `cache`, no se recibe como
+ * parámetro: `cache` memoiza por argumentos, y un objeto nuevo en cada
+ * llamada haría que no acertara nunca — que es justo lo que este `cache`
+ * viene a evitar.
+ */
+export const getLeague = cache(async () =>
+  getRivalsDashboard(await resolveTenant()),
+);
 
 export interface RivalContext {
   rival: RivalView;

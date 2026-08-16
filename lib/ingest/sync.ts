@@ -1,6 +1,8 @@
 import { and, eq, inArray, isNull, lt, notInArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { DEFAULT_ACCOUNT_ID } from "@/lib/tenant";
 import {
+  accountLeagues,
   activityEvents,
   managerSnapshots,
   managers,
@@ -15,6 +17,7 @@ import {
   syncRuns,
 } from "@/lib/db/schema";
 import { initialBudget } from "@/lib/engine/rules";
+import { FantasySession } from "@/lib/fantasy/auth";
 import { FantasyClient } from "@/lib/fantasy/client";
 import { endpoints } from "@/lib/fantasy/endpoints";
 import { ShapeCollector } from "./mapper";
@@ -43,6 +46,8 @@ import { RawRecorder } from "./raw";
 
 export interface SyncOptions {
   client?: FantasyClient;
+  /** De quién es la credencial y a quién se le anota la liga. */
+  accountId?: string;
   leagueId?: string;
   /** false = lee de la API pero no escribe en la base de datos (`--dry-run`). */
   persist?: boolean;
@@ -150,6 +155,7 @@ function asArray(payload: unknown): unknown[] {
 }
 
 export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
+  const accountId = options.accountId ?? DEFAULT_ACCOUNT_ID;
   const persist = options.persist ?? true;
   const log = options.log ?? (() => {});
   const shape = options.collectShape ? new ShapeCollector() : null;
@@ -160,6 +166,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
   const client =
     options.client ??
     new FantasyClient({
+      session: new FantasySession(accountId),
       onResponse: recorder ? (record) => recorder.record(record) : undefined,
     });
 
@@ -180,7 +187,34 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
 
   try {
     /* --- 1. Liga --------------------------------------------------- */
-    let leagueId = options.leagueId ?? process.env.FANTASY_LEAGUE_ID ?? null;
+    /**
+     * De dónde sale la liga, por orden: lo que pida quien llama, lo que ya
+     * tenga anotado la cuenta, la variable de entorno —que se conserva por
+     * compatibilidad con el despliegue de un solo dueño— y, en último
+     * término, la primera que devuelva la API.
+     *
+     * Lo que cambia respecto a antes es que la base de datos manda sobre el
+     * entorno: la liga es una propiedad de la cuenta, no del proceso.
+     */
+    const [storedLeague] = db
+      ? await db
+          .select({ leagueId: accountLeagues.leagueId })
+          .from(accountLeagues)
+          .where(
+            and(
+              eq(accountLeagues.accountId, accountId),
+              eq(accountLeagues.active, true),
+            ),
+          )
+          .orderBy(accountLeagues.createdAt)
+          .limit(1)
+      : [];
+
+    let leagueId =
+      options.leagueId ??
+      storedLeague?.leagueId ??
+      process.env.FANTASY_LEAGUE_ID ??
+      null;
 
     const leaguesPayload = await client.get(endpoints.leagues());
     const leagues = asArray(leaguesPayload);
@@ -202,6 +236,16 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       );
     }
     log(`Liga: ${leagueId}`);
+
+    // La fila de `sync_runs` se abre antes de saber la liga, así que se anota
+    // ahora: es lo que permite que el panel de una liga enseñe el estado de su
+    // sincronización y no el de otra.
+    if (db && runId !== null) {
+      await db
+        .update(syncRuns)
+        .set({ leagueId })
+        .where(eq(syncRuns.id, runId));
+    }
 
     /* --- 2. Jugadores ---------------------------------------------- */
     const playersPayload = await client.get(endpoints.players());
@@ -329,15 +373,21 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       (parsedManagers.length === 1 ? parsedManagers[0]!.id : null);
 
     if (db && myTeamId && parsedManagers.some((m) => m.id === myTeamId)) {
-      // Sin filtrar por liga a propósito. Los paneles leen `isMe` con un
-      // `limit 1`, así que una marca superviviente de una liga anterior —al
-      // dejarla o al cambiarse— haría que la app siguiera enseñando aquel
-      // equipo, con datos que ya nadie actualiza. Solo puede haber un "yo".
-      await db.update(managers).set({ isMe: false });
+      /**
+       * La identidad se anota en `account_leagues`, no en `managers`.
+       *
+       * Aquí vivía `UPDATE managers SET is_me = false` **sin `WHERE`**, seguido
+       * de marcar el equipo bueno. Con una sola cuenta funcionaba; con dos, la
+       * sincronización de una le borraba la identidad a la otra. Ahora la marca
+       * es de la cuenta y no puede pisar a nadie.
+       */
       await db
-        .update(managers)
-        .set({ isMe: true })
-        .where(eq(managers.id, myTeamId));
+        .insert(accountLeagues)
+        .values({ accountId, leagueId, myTeamId })
+        .onConflictDoUpdate({
+          target: [accountLeagues.accountId, accountLeagues.leagueId],
+          set: { myTeamId, active: true },
+        });
       stats.myTeamIdentified = 1;
     } else {
       stats.myTeamIdentified = 0;
@@ -864,12 +914,19 @@ export async function reconcileStaleRuns(now = new Date()): Promise<number> {
   return closed.length;
 }
 
-/** Última sincronización, para el panel de estado. */
-export async function lastSyncRun() {
+/**
+ * Última sincronización de una liga, para el panel de estado.
+ *
+ * Sin filtrar por liga, el panel de un cliente enseñaría el estado de la
+ * sincronización de otro — y en particular daría por buena la suya cuando la
+ * que falló era la propia.
+ */
+export async function lastSyncRun(leagueId?: string) {
   const db = getDb();
   const [run] = await db
     .select()
     .from(syncRuns)
+    .where(leagueId ? eq(syncRuns.leagueId, leagueId) : undefined)
     .orderBy(sql`${syncRuns.startedAt} DESC`)
     .limit(1);
   return run ?? null;

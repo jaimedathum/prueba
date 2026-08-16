@@ -1,3 +1,4 @@
+import { resolveTenant } from "@/lib/tenant";
 import { revalidatePath } from "next/cache";
 import { desc, eq } from "drizzle-orm";
 import { LOCKED_MESSAGE, hasAdminSession, requireAdminSession } from "@/lib/admin-gate";
@@ -89,6 +90,7 @@ async function saveOverride(formData: FormData): Promise<void> {
   }
 
   await setOverride({
+    accountId: (await resolveTenant()).accountId,
     entity,
     entityId,
     field,
@@ -104,7 +106,9 @@ async function removeOverride(formData: FormData): Promise<void> {
 
   if (!(await requireAdminSession()).ok) return;
 
+  const { accountId } = await resolveTenant();
   await clearOverride(
+    accountId,
     String(formData.get("entity") ?? ""),
     String(formData.get("entityId") ?? ""),
     String(formData.get("field") ?? ""),

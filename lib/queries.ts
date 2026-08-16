@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   managers,
@@ -6,6 +6,7 @@ import {
   rosterEntries,
   syncRuns,
 } from "@/lib/db/schema";
+import type { TenantContext } from "@/lib/tenant";
 import { applyOverrides, loadOverrides, type Overridden } from "@/lib/overrides";
 import { positionCode } from "@/lib/domain/positions";
 
@@ -41,19 +42,24 @@ export interface DashboardData {
   } | null;
 }
 
-export async function getDashboardData(): Promise<DashboardData> {
+export async function getDashboardData(
+  ctx: TenantContext,
+): Promise<DashboardData> {
   const db = getDb();
 
   const [lastSync] = await db
     .select()
     .from(syncRuns)
+    .where(eq(syncRuns.leagueId, ctx.leagueId))
     .orderBy(desc(syncRuns.startedAt))
     .limit(1);
 
   const [me] = await db
     .select()
     .from(managers)
-    .where(eq(managers.isMe, true))
+    .where(
+      and(eq(managers.id, ctx.myTeamId), eq(managers.leagueId, ctx.leagueId)),
+    )
     .limit(1);
 
   if (!me) {
@@ -71,9 +77,14 @@ export async function getDashboardData(): Promise<DashboardData> {
     })
     .from(rosterEntries)
     .innerJoin(players, eq(players.id, rosterEntries.playerId))
-    .where(eq(rosterEntries.managerId, me.id));
+    .where(
+      and(
+        eq(rosterEntries.leagueId, ctx.leagueId),
+        eq(rosterEntries.managerId, me.id),
+      ),
+    );
 
-  const overrides = await loadOverrides("player");
+  const overrides = await loadOverrides(ctx.accountId, "player");
   const withOverrides = applyOverrides(rows, (row) => row.playerId, overrides);
 
   const squad: SquadRow[] = withOverrides

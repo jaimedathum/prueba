@@ -12,6 +12,7 @@ import {
   loginWithPassword,
 } from "@/lib/fantasy/auth";
 import { checkAdminSecret, grantAdminSession } from "@/lib/admin-gate";
+import { DEFAULT_ACCOUNT_ID } from "@/lib/tenant";
 import { decryptToken, encryptToken } from "@/lib/fantasy/crypto";
 
 /**
@@ -99,7 +100,7 @@ export async function loginAction(
 
   try {
     const tokens = await loginWithPassword(email, password);
-    await new FantasySession().adopt(tokens);
+    await new FantasySession(DEFAULT_ACCOUNT_ID).adopt(tokens);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return { ok: false, message: `${detail}\n\n${SOCIAL_ACCOUNT_HINT}` };
@@ -200,7 +201,10 @@ export async function completeInteractiveLogin(
 
   try {
     const tokens = await exchangeAuthorizationCode(code, verifier);
-    await new FantasySession().adopt(tokens, getInteractiveConfig().policy);
+    await new FantasySession(DEFAULT_ACCOUNT_ID).adopt(
+      tokens,
+      getInteractiveConfig().policy,
+    );
   } catch (error) {
     return {
       ok: false,

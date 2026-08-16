@@ -15,6 +15,73 @@ import {
 } from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ *
+ * TENENCIA
+ *
+ * El eje de aislamiento no es el mismo para todo, y esa es la decisión de
+ * diseño central:
+ *
+ * - Los **datos del juego** se scopean por `league_id`. Lo que pasa en una
+ *   liga es idéntico para todos los que están dentro, así que dos suscriptores
+ *   de la misma liga comparten la ingesta en vez de duplicarla.
+ * - La **propiedad** se scopea por `account_id`: credenciales, correcciones
+ *   manuales, avisos enviados y decisiones son de quien paga, no de la liga.
+ * - Los **datos de LaLiga** (`players`, `matches`, `real_teams`…) no llevan
+ *   scope ninguno: son los mismos para todo el mundo y se ingieren una vez.
+ * ------------------------------------------------------------------ */
+
+/** Un cliente. Hoy uno; mañana, los que paguen. */
+export const accounts = pgTable("accounts", {
+  id: text("id").primaryKey(),
+  /** 'active' | 'suspended' */
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
+ * Qué liga mira cada cuenta y cuál es su equipo dentro de ella.
+ *
+ * Sustituye a dos cosas que estaban mal por motivos distintos:
+ *
+ * 1. `managers.is_me`, un booleano global que se escribía con un `UPDATE` sin
+ *    `WHERE`. Con dos cuentas en la misma liga, cada sincronización le habría
+ *    robado la identidad a la otra.
+ * 2. Las variables de entorno `FANTASY_LEAGUE_ID`, `FANTASY_TEAM_ID`,
+ *    `FANTASY_COMPETITION_ID`, `FANTASY_INITIAL_BUDGET` y
+ *    `FANTASY_CLAUSE_MULTIPLIER`, que son propiedades de *una* liga y no del
+ *    proceso que la sirve.
+ */
+export const accountLeagues = pgTable(
+  "account_leagues",
+  {
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leagueId: text("league_id").notNull(),
+    /** El equipo de esta cuenta dentro de esta liga. */
+    myTeamId: text("my_team_id"),
+    competitionId: text("competition_id").notNull().default("1"),
+    /**
+     * Nullable a propósito: `null` significa "usa el valor por defecto del
+     * juego". Así una liga privada puede cambiarlos sin que el resto herede
+     * su rareza, y no hay que rellenar nada al migrar.
+     */
+    initialBudget: bigint("initial_budget", { mode: "number" }),
+    clauseMultiplier: integer("clause_multiplier"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.leagueId] }),
+    index("account_leagues_league_idx").on(t.leagueId),
+    index("account_leagues_active_idx").on(t.active),
+  ],
+);
+
+/* ------------------------------------------------------------------ *
  * CAPA 1 — CRUDA (append-only)
  *
  * Respuestas tal cual, sin interpretar. Nunca se borra ni se actualiza.
@@ -142,7 +209,9 @@ export const managers = pgTable(
     leagueId: text("league_id").notNull(),
     teamName: text("team_name").notNull(),
     managerName: text("manager_name"),
-    isMe: boolean("is_me").notNull().default(false),
+    // `is_me` vivía aquí y era el punto más incompatible con multi-tenancy de
+    // todo el proyecto: un booleano global, escrito con un UPDATE sin WHERE.
+    // Ahora la identidad es de la cuenta, en `account_leagues.my_team_id`.
     /** Saldo, solo cuando la API lo expone (para el tuyo siempre; para el resto casi nunca). */
     reportedBalance: bigint("reported_balance", { mode: "number" }),
     teamValue: bigint("team_value", { mode: "number" }),
@@ -277,6 +346,14 @@ export const manualOverrides = pgTable(
   "manual_overrides",
   {
     id: serial("id").primaryKey(),
+    /**
+     * De quién es la corrección. Los ids de jugador y de manager son globales
+     * de LaLiga, así que sin esto la corrección de un cliente se aplicaría a
+     * todos: el espacio de claves era compartido.
+     */
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
     /** 'player' | 'manager' | 'roster_entry' | 'activity_event' | 'market_listing' */
     entity: text("entity").notNull(),
     entityId: text("entity_id").notNull(),
@@ -289,7 +366,12 @@ export const manualOverrides = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("manual_overrides_lookup_idx").on(t.entity, t.entityId, t.active),
+    index("manual_overrides_lookup_idx").on(
+      t.accountId,
+      t.entity,
+      t.entityId,
+      t.active,
+    ),
   ],
 );
 
@@ -401,11 +483,24 @@ export const injuryReports = pgTable(
 
 /** Token de sesión de la API, cifrado en reposo (AES-256-GCM). */
 export const authTokens = pgTable("auth_tokens", {
-  /** Singleton: siempre 'default'. La app es de un solo usuario. */
-  id: text("id").primaryKey(),
+  /**
+   * Una credencial de LaLiga por cuenta.
+   *
+   * Antes era un singleton literal —`id` siempre `'default'`— y esa constante
+   * era el techo duro del proyecto: no había forma de guardar un segundo
+   * token en la misma base de datos.
+   */
+  accountId: text("account_id")
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: "cascade" }),
   encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
   iv: text("iv").notNull(),
   authTag: text("auth_tag").notNull(),
+  /**
+   * Con qué versión de `TOKEN_ENCRYPTION_KEY` se cifró. Permite rotar la clave
+   * sin dejar ilegibles de golpe los tokens de todos los clientes.
+   */
+  keyVersion: integer("key_version").notNull().default(1),
   /**
    * Política de B2C que emitió el token. Un refresh token está atado a su
    * política: refrescarlo con otra falla. Como el login por contraseña y el
@@ -422,6 +517,12 @@ export const syncRuns = pgTable(
   "sync_runs",
   {
     id: serial("id").primaryKey(),
+    /**
+     * Qué liga se sincronizó. Nullable porque en la fase 1c habrá también
+     * ejecuciones globales —el catálogo de jugadores y el calendario, que son
+     * los mismos para todo el mundo— y esas no pertenecen a ninguna liga.
+     */
+    leagueId: text("league_id"),
     startedAt: timestamp("started_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -431,7 +532,10 @@ export const syncRuns = pgTable(
     stats: jsonb("stats").$type<Record<string, number>>(),
     error: text("error"),
   },
-  (t) => [index("sync_runs_started_idx").on(t.startedAt)],
+  (t) => [
+    index("sync_runs_started_idx").on(t.startedAt),
+    index("sync_runs_league_idx").on(t.leagueId, t.startedAt),
+  ],
 );
 
 /**
@@ -444,13 +548,25 @@ export const syncRuns = pgTable(
 export const sentAlerts = pgTable(
   "sent_alerts",
   {
+    /**
+     * La clave es estable pero **no** única entre clientes: el riesgo de
+     * cláusula sobre el mismo jugador genera la misma clave para dos cuentas
+     * distintas. Con `key` como clave primaria a secas, el primero en recibir
+     * el aviso silenciaba al segundo.
+     */
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
     /** Clave estable del aviso: mismo problema, misma clave. */
-    key: text("key").primaryKey(),
+    key: text("key").notNull(),
     kind: text("kind").notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
     body: text("body").notNull(),
   },
-  (t) => [index("sent_alerts_sent_idx").on(t.sentAt)],
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.key] }),
+    index("sent_alerts_sent_idx").on(t.sentAt),
+  ],
 );
 
 /**
@@ -461,6 +577,9 @@ export const decisionLog = pgTable(
   "decision_log",
   {
     id: serial("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -473,5 +592,5 @@ export const decisionLog = pgTable(
     /** Se rellena a posteriori para medir el acierto. */
     outcome: jsonb("outcome"),
   },
-  (t) => [index("decision_log_kind_idx").on(t.kind, t.createdAt)],
+  (t) => [index("decision_log_kind_idx").on(t.accountId, t.kind, t.createdAt)],
 );

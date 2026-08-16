@@ -1,6 +1,7 @@
 import { getMarketDashboard } from "@/lib/engine/market-load";
 import { getRiskDashboard } from "@/lib/engine/load";
 import { lastSyncRun, reconcileStaleRuns } from "@/lib/ingest/sync";
+import type { TenantContext } from "@/lib/tenant";
 import { buildAlerts } from "./digest";
 import { loadSentAlerts, recordSentAlerts, selectAlertsToSend } from "./dedupe";
 import {
@@ -36,6 +37,7 @@ export interface RunOptions {
 }
 
 export async function runAlerts(
+  ctx: TenantContext,
   options: RunOptions = {},
 ): Promise<AlertRunResult> {
   const now = options.now ?? new Date();
@@ -47,9 +49,9 @@ export async function runAlerts(
   await reconcileStaleRuns(now).catch(() => 0);
 
   const [risk, market, sync] = await Promise.all([
-    getRiskDashboard().catch(() => null),
-    getMarketDashboard(now).catch(() => null),
-    lastSyncRun().catch(() => null),
+    getRiskDashboard(ctx).catch(() => null),
+    getMarketDashboard(ctx, now).catch(() => null),
+    lastSyncRun(ctx.leagueId).catch(() => null),
   ]);
 
   const alerts: Alert[] = buildAlerts({
@@ -62,7 +64,7 @@ export async function runAlerts(
     lastSyncError: sync?.error ?? null,
   });
 
-  const alreadySent = await loadSentAlerts(alerts.map((a) => a.key));
+  const alreadySent = await loadSentAlerts(ctx.accountId, alerts.map((a) => a.key));
   const toSend = selectAlertsToSend(alerts, alreadySent, now);
 
   if (toSend.length === 0) {
@@ -111,7 +113,7 @@ export async function runAlerts(
   });
   // Solo se registra tras un envío correcto: si falla, se reintenta mañana
   // en vez de dar por avisado algo que nunca llegó.
-  await recordSentAlerts(toSend);
+  await recordSentAlerts(ctx.accountId, toSend);
 
   return {
     generated: alerts.length,

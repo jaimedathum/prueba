@@ -18,13 +18,25 @@ export interface Overridden {
   overriddenFields: string[];
 }
 
-export async function loadOverrides(entity: string): Promise<OverrideMap> {
+/**
+ * Los ids de jugador y de manager son globales de LaLiga, así que sin
+ * `accountId` el espacio de claves sería compartido: la corrección que un
+ * cliente hace sobre un jugador se le aplicaría a todos los demás.
+ */
+export async function loadOverrides(
+  accountId: string,
+  entity: string,
+): Promise<OverrideMap> {
   const db = getDb();
   const rows = await db
     .select()
     .from(manualOverrides)
     .where(
-      and(eq(manualOverrides.entity, entity), eq(manualOverrides.active, true)),
+      and(
+        eq(manualOverrides.accountId, accountId),
+        eq(manualOverrides.entity, entity),
+        eq(manualOverrides.active, true),
+      ),
     );
 
   const map: OverrideMap = new Map();
@@ -72,6 +84,7 @@ export function applyOverrides<T extends object>(
 }
 
 export async function setOverride(input: {
+  accountId: string;
   entity: string;
   entityId: string;
   field: string;
@@ -86,6 +99,7 @@ export async function setOverride(input: {
     .set({ active: false })
     .where(
       and(
+        eq(manualOverrides.accountId, input.accountId),
         eq(manualOverrides.entity, input.entity),
         eq(manualOverrides.entityId, input.entityId),
         eq(manualOverrides.field, input.field),
@@ -94,6 +108,7 @@ export async function setOverride(input: {
     );
 
   await db.insert(manualOverrides).values({
+    accountId: input.accountId,
     entity: input.entity,
     entityId: input.entityId,
     field: input.field,
@@ -103,6 +118,7 @@ export async function setOverride(input: {
 }
 
 export async function clearOverride(
+  accountId: string,
   entity: string,
   entityId: string,
   field: string,
@@ -113,6 +129,7 @@ export async function clearOverride(
     .set({ active: false })
     .where(
       and(
+        eq(manualOverrides.accountId, accountId),
         eq(manualOverrides.entity, entity),
         eq(manualOverrides.entityId, entityId),
         eq(manualOverrides.field, field),

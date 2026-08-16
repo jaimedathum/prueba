@@ -1,5 +1,6 @@
-import { asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import type { TenantContext } from "@/lib/tenant";
 import {
   activityEvents,
   managers,
@@ -128,17 +129,21 @@ export interface RivalsDashboard {
   warnings: string[];
 }
 
-export async function getRivalsDashboard(): Promise<RivalsDashboard | null> {
+export async function getRivalsDashboard(
+  ctx: TenantContext,
+): Promise<RivalsDashboard | null> {
   const db = getDb();
 
   const [me] = await db
     .select()
     .from(managers)
-    .where(eq(managers.isMe, true))
+    .where(
+      and(eq(managers.id, ctx.myTeamId), eq(managers.leagueId, ctx.leagueId)),
+    )
     .limit(1);
   if (!me) return null;
 
-  const leagueId = me.leagueId;
+  const leagueId = ctx.leagueId;
   const warnings: string[] = [];
 
   const allManagers = await db

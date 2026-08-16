@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { sentAlerts } from "@/lib/db/schema";
 import { COOLDOWN_HOURS, meetsThreshold, type Alert } from "./types";
@@ -35,7 +35,14 @@ export function selectAlertsToSend(
   });
 }
 
+/**
+ * Las claves son estables pero **no** únicas entre clientes: el riesgo de
+ * cláusula sobre el mismo jugador produce la misma clave para dos cuentas
+ * distintas. Sin el scope, el primero en recibir un aviso silenciaba a todos
+ * los demás durante su enfriamiento.
+ */
 export async function loadSentAlerts(
+  accountId: string,
   keys: string[],
 ): Promise<Map<string, Date>> {
   if (keys.length === 0) return new Map();
@@ -43,24 +50,30 @@ export async function loadSentAlerts(
   const rows = await db
     .select({ key: sentAlerts.key, sentAt: sentAlerts.sentAt })
     .from(sentAlerts)
-    .where(inArray(sentAlerts.key, keys));
+    .where(
+      and(eq(sentAlerts.accountId, accountId), inArray(sentAlerts.key, keys)),
+    );
   return new Map(rows.map((row) => [row.key, row.sentAt]));
 }
 
-export async function recordSentAlerts(alerts: Alert[]): Promise<void> {
+export async function recordSentAlerts(
+  accountId: string,
+  alerts: Alert[],
+): Promise<void> {
   if (alerts.length === 0) return;
   const db = getDb();
   await db
     .insert(sentAlerts)
     .values(
       alerts.map((alert) => ({
+        accountId,
         key: alert.key,
         kind: alert.kind,
         body: `${alert.title}\n${alert.body}`,
       })),
     )
     .onConflictDoUpdate({
-      target: sentAlerts.key,
+      target: [sentAlerts.accountId, sentAlerts.key],
       set: { sentAt: new Date() },
     });
 }
